@@ -338,7 +338,7 @@ Person Initials	M
 Person First Name	David
 Person Email	davidr\@ebi.ac.uk
 Person Role	EFO_0001741
-Publication PubMed ID
+Publication PubMed ID 25854118
 Publication DOI	doi:10.1186/s13059-015-0622-4
 
 [SCD]
