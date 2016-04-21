@@ -1,4 +1,5 @@
 #!/usr/bin/env perl
+
 =pod
 
 =head1 LICENSE
@@ -68,6 +69,7 @@ my $mode              = 'report';
 my $output_dir        = getcwd;
 my $allow_removal     = undef;
 my $help              = undef;
+my $quiet             = undef;
 
 GetOptions(
   "group_id=s"          => \$group_id,
@@ -79,6 +81,7 @@ GetOptions(
   "mode=s"              => \$mode,
   "output_dir=s"        => \$output_dir,
   "help"                => \$help,
+  "quiet"               => \$quiet,
 );
 
 perldocs() if $help;
@@ -123,7 +126,7 @@ elsif ( $mode eq 'update' ) {
 sub full_report {
   my ($commonality) = @_;
 
-  print "Updates to $group_id:$/";
+  print_unless_quiet("Updates to $group_id:");
   report_changes( *STDOUT, $commonality );
   print_changes( *STDOUT, $commonality );
 }
@@ -140,9 +143,9 @@ sub dry_run {
     validate_slurped_sample_tab( $st, $filename );
   }
   else {
-    print "No changes to be made$/";
+    print_unless_quiet("No changes to be made");
   }
-  print "Dry run completed successfully.$/";
+  print_unless_quiet("Dry run completed successfully.");
 }
 
 sub update {
@@ -161,9 +164,9 @@ sub update {
     submit_slurped_sample_tab( $st, $filename );
   }
   else {
-    print "No changes to be made$/";
+    print_unless_quiet("No changes to be made");
   }
-  print "Update completed successfully.$/";
+  print_unless_quiet("Update completed successfully");
 }
 
 sub write_changes_file {
@@ -200,7 +203,7 @@ sub submit_slurped_sample_tab {
   my $st_corrected = $output->{sampletab};
 
   if ( !$errors ) {
-    die "Could not find 'errors' in submission response body from $uri";
+    die "Could not find 'errors' in submission response body from $uri, received this output:".Dumper($output);
   }
 
   if (@$errors) {
@@ -375,6 +378,12 @@ sub print_changes {
     print $fh "$rem_text\t$id$/";
   }
 
+}
+
+sub print_unless_quiet {
+  my ($text) = @_;
+  
+  print $text.$/ unless $quiet;
 }
 
 sub report_changes {
