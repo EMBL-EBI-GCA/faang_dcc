@@ -143,6 +143,7 @@ sub dry_run {
     write_sampletab( $commonality, $filename );
     my $st = slurp_file($filename);
     validate_slurped_sample_tab( $st, $filename );
+    write_changes_file( $filename, $commonality );
   }
   else {
     print_unless_quiet("No changes to be made");
@@ -158,7 +159,7 @@ sub update {
   my $total_changes = report_changes( $reporter_fh, $commonality );
   
   
-  if ( $total_changes || 1 ) {
+  if ( $total_changes ) {
     my $filename = new_filename();
     write_sampletab( $commonality, $filename );
     my $st = slurp_file($filename);
