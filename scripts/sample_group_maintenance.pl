@@ -70,6 +70,7 @@ my $output_dir        = getcwd;
 my $allow_removal     = undef;
 my $help              = undef;
 my $quiet             = undef;
+my $paranoia          = undef;
 
 GetOptions(
   "group_id=s"          => \$group_id,
@@ -82,6 +83,7 @@ GetOptions(
   "output_dir=s"        => \$output_dir,
   "help"                => \$help,
   "quiet"               => \$quiet,
+  "paranoia"            => \$paranoia,
 );
 
 perldocs() if $help;
@@ -97,7 +99,7 @@ die "Need a biosample api key for updates"
   if $mode eq 'update' && !$biosample_api_key;
 
 if ( $mode eq 'update' || $mode eq 'dryrun' ) {
-  die "Need a output dir" unless $output_dir && -w $output_dir;
+  die "Need an output dir" unless $output_dir && -w $output_dir;
   die "Need a writeable output dir" unless -w $output_dir;
 }
 
@@ -133,7 +135,7 @@ sub full_report {
 
 sub dry_run {
   my ($commonality) = @_;
-  print "Dry run mode. No changes will be made.$/";
+  print_unless_quiet("Dry run mode. No changes will be made.");
   my $total_changes = report_changes( *STDOUT, $commonality );
 
   if ($total_changes) {
@@ -150,9 +152,12 @@ sub dry_run {
 
 sub update {
   my ($commonality) = @_;
-  print "Dry run mode. No changes will be made.$/";
-  my $total_changes = report_changes( *STDOUT, $commonality );
+  print_unless_quiet("Update mode. Changes will be made.");
 
+  my $reporter_fh = $quiet ? undef : *STDOUT;
+  my $total_changes = report_changes( $reporter_fh, $commonality );
+  
+  
   if ( $total_changes || 1 ) {
     my $filename = new_filename();
     write_sampletab( $commonality, $filename );
@@ -198,12 +203,21 @@ sub submit_slurped_sample_tab {
       . $response->status_line;
   }
 
+  if ($paranoia){
+    open(my $fh,'>',$filename.'.biosample_response');
+    print $fh $response->decoded_content;
+    close $fh;
+  }
+
   my $output       = decode_json $response->decoded_content;
   my $errors       = $output->{errors};
   my $st_corrected = $output->{sampletab};
 
+
   if ( !$errors ) {
-    die "Could not find 'errors' in submission response body from $uri, received this output:".Dumper($output);
+    die
+"Could not find 'errors' in submission response body from $uri, received this output:"
+      . Dumper($output);
   }
 
   if (@$errors) {
@@ -382,8 +396,8 @@ sub print_changes {
 
 sub print_unless_quiet {
   my ($text) = @_;
-  
-  print $text.$/ unless $quiet;
+
+  print $text. $/ unless $quiet;
 }
 
 sub report_changes {
@@ -400,7 +414,7 @@ sub report_changes {
   my $removal = $allow_removal ? 'allowed' : 'disallowed';
 
   print $fh
-"Found IDs to add: $ids_to_add_count; to remove ($removal): $ids_to_remove_count; unaffected: $common_ids_count; Total changes: $total_changes$/";
+"Found IDs to add: $ids_to_add_count; to remove ($removal): $ids_to_remove_count; unaffected: $common_ids_count; Total changes: $total_changes$/" if $fh;
 
   return $total_changes;
 }
