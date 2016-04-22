@@ -317,7 +317,7 @@ sub new_filename {
   my $fn;
 
   while ( !$fn || -e $fn ) {
-    $fn = join( '.', $group_id, $date, substr( time, -5 ), $suffix );
+    $fn = $output_dir.'/'.join( '.', $group_id, $date, substr( time, -5 ), $suffix );
   }
 
   return $fn;
