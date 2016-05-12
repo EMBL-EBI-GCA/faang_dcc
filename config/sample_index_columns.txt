@@ -1,0 +1,42 @@
+Sample Name
+Sample Description
+Material
+Organism
+Sex
+Child Of
+animal age at collection
+availability
+birth date
+birth location
+birth location latitude
+birth location longitude
+birth weight
+breed
+cell culture protocol
+cell type
+culture conditions
+culture type
+developmental stage
+fasted status
+gestational age at sample collection
+health status
+health status at collection
+lactation duration
+markers
+number of passages
+number of pieces
+organism part
+parturition trait
+pedigree
+phenotype
+placental weight
+pregnancy length
+purification protocol
+same as
+specimen collection date
+specimen collection protocol
+specimen picture url
+specimen size
+specimen volume
+specimen weight
+
