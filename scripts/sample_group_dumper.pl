@@ -120,7 +120,7 @@ GetOptions(
   "value_sep=s"       => \$value_sep,
   "empty_value=s"     => \$empty_value,
   "units_to_omit=s"   => \@omit_units,
-  "tsv_column=s"     => \@tsv_columns,
+  "tsv_column=s"      => \@tsv_columns,
   "tsv_column_file=s" => \$tsv_column_file,
 
   #json specific output
@@ -132,7 +132,7 @@ GetOptions(
 
   #misc
   "help" => \$help,
-);
+) || croak "Unexpected arguments: $!";
 
 perldocs() if $help;
 
@@ -359,7 +359,7 @@ sub tsv_output {
   for my $s (@$samples) {
     my @vals = ( $s->{id}, $s->{release_date}, $s->{update_date}, );
 
-    for my $property_name ( @p_headers ) {
+    for my $property_name (@p_headers) {
       my $vals = $s->{properties}{$property_name};
 
       if ($vals) {
@@ -396,7 +396,7 @@ sub dynamic_property_headers {
   for my $s (@$samples) {
     map { $property_names{$_} = 1 } keys %{ $s->{properties} };
   }
-  my %p_header_filter = map { $_ => 1 } ( @$fixed_p_headers, 'project' );
+  my %p_header_filter = map { $_ => 1 } (@$fixed_p_headers);
 
   my @dynamic_p_headers =
     sort { $a cmp $b } grep { !$p_header_filter{$_} } keys %property_names;
