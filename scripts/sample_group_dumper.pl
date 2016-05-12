@@ -46,16 +46,23 @@ Use either -sample_group_id, -search_tag_field and -search_tag_value, or -json_s
   -line_sep string to separate lines in tsv, defaults to newline (\n)
   -value_sep string to separate values in tsv, where there are multiple values for a single header
   -empty_value string to use where a cell does not have a value in tsv, defaults to an empty string
-  -omit_units units matching these values in this list will not be included in tsv output. By default YYYY-MM-DD, YYYY-MM and YYYY are elided, other units are included in value column
+  -omit_units units matching these values in this list will not be included in tsv output. By default YYYY-MM-DD, YYYY-MM and YYYY are omited, other units are included in value column
+  -tsv_column, column to use in output
+  -tsv_column_file, file containing a list of columns to use in output
+
+
+=head2 JSON formating
+
+  -pretty_json, boolean flag, make the json more human readable 
 
 =head2 DATA PROCESSING
 
-  -inherit_attributes, binary flag, should attributes be inherited via 'Derived from' relationships
-  -cleanup_submission_dates, binary flag, should we strip the time from submission release and update fields
+  -inherit_attributes, boolean flag, should attributes be inherited via 'Derived from' relationships
+  -cleanup_submission_dates, boolean flag, should we strip the time from submission release and update fields
 
 =head2 MISC
 
-  -help, binary flag to print out the perl docs
+  -help, boolean flag to print out the perl docs
 
 =cut
 
@@ -80,17 +87,20 @@ my $search_tag_value;
 my $json_source;
 my $sample_group_id;
 
+my $cleanup_submission_dates = 1;
 my $inherit_attributes;
-my $help;
 
 my $col_sep     = "\t";
 my $line_sep    = "\n";
 my $value_sep   = ";";
 my $empty_value = '';
+my @omit_units  = qw(YYYY YYYY-MM YYYY-MM-DD);
+my @tsv_columns;
+my $tsv_column_file;
 
-my $cleanup_submission_dates = 1;
+my $pretty_json;
 
-my @omit_units = qw(YYYY YYYY-MM YYYY-MM-DD);
+my $help;
 
 GetOptions(
 
@@ -105,11 +115,16 @@ GetOptions(
   "output=s"        => \$output,
 
   #tsv specific output
-  "col_sep=s"       => \$col_sep,
-  "line_sep=s"      => \$line_sep,
-  "value_sep=s"     => \$value_sep,
-  "empty_value=s"   => \$empty_value,
-  "units_to_omit=s" => \@omit_units,
+  "col_sep=s"         => \$col_sep,
+  "line_sep=s"        => \$line_sep,
+  "value_sep=s"       => \$value_sep,
+  "empty_value=s"     => \$empty_value,
+  "units_to_omit=s"   => \@omit_units,
+  "tsv_column=s"     => \@tsv_columns,
+  "tsv_column_file=s" => \$tsv_column_file,
+
+  #json specific output
+  "pretty_json" => \$pretty_json,
 
   #processing
   "cleanup_submission_dates" => \$cleanup_submission_dates,
@@ -135,6 +150,8 @@ croak "please specify -output_format $output_format_string"
   unless ( $output_format && any { $_ eq $output_format }
   @valid_output_formats );
 croak "please specify -output <file>" if ( $output_format && !$output );
+
+@tsv_columns = load_tsv_columns($tsv_column_file) if ($tsv_column_file);
 
 my $samples;
 
@@ -177,10 +194,20 @@ else {
 }
 
 if ( $output_format eq 'tsv' ) {
-  tsv_output( $samples, $fh );
+  tsv_output(
+    $samples, $fh,
+    {
+      col_sep          => $col_sep,
+      line_sep         => $line_sep,
+      value_sep        => $value_sep,
+      empty_value      => $empty_value,
+      omit_units       => \@omit_units,
+      property_columns => \@tsv_columns,
+    }
+  );
 }
 if ( $output_format eq 'json' ) {
-  json_output( $samples, $fh );
+  json_output( $samples, $fh, $pretty_json );
 }
 
 close($fh) if ($close_fh);
@@ -281,40 +308,58 @@ sub cleanup_submission_dates {
 }
 
 sub json_output {
-  my ( $samples, $fh ) = @_;
+  my ( $samples, $fh, $pretty_json ) = @_;
 
-  my $json = JSON->new->pretty;
+  my $json = JSON->new;
 
-  print $fh $json->pretty->encode($samples);
+  if ($pretty_json) {
+    $json = $json->pretty;
+  }
+
+  print $fh $json->encode($samples);
 }
 
 sub tsv_output {
-  my ( $samples, $fh ) = @_;
+  my ( $samples, $fh, $f ) = @_;
+
+  my $col_sep          = $f->{col_sep};
+  my $lin_sep          = $f->{line_sep};
+  my $value_sep        = $f->{value_sep};
+  my $empty_value      = $f->{empty_value};
+  my $omit_units       = $f->{omit_units};
+  my $property_columns = $f->{property_columns};
 
   my @fixed_s_headers = ( 'BioSamples ID', 'release date', 'update date' );
-  my @fixed_p_headers =
-    ( 'Sample Name', 'Sample Description', 'Material', 'Organism', 'Sex', );
   my @fixed_d_headers = ('Derived from');
+
+  my @p_headers;
+
+  if ( $property_columns && @$property_columns ) {
+    @p_headers = @$property_columns;
+  }
+  else {
+    my @fixed_p_headers =
+      ( 'Sample Name', 'Sample Description', 'Material', 'Organism', 'Sex', );
+    my @dynamic_p_headers =
+      dynamic_property_headers( $samples, \@fixed_p_headers );
+
+    @p_headers = ( @fixed_p_headers, @dynamic_p_headers );
+  }
 
   my %property_names;
   for my $s (@$samples) {
     map { $property_names{$_} = 1 } keys %{ $s->{properties} };
   }
 
-  my %units_to_elide = map { $_ => 1 } @omit_units;
+  my %units_to_omit = map { $_ => 1 } @$omit_units;
 
-  my @dynamic_p_headers =
-    dynamic_property_headers( $samples, \@fixed_p_headers );
-
-  print $fh join( $col_sep,
-    @fixed_s_headers,   @fixed_p_headers,
-    @dynamic_p_headers, @fixed_d_headers )
+  print $fh join( $col_sep, @fixed_s_headers, @p_headers, @fixed_d_headers )
     . $line_sep;
 
   for my $s (@$samples) {
     my @vals = ( $s->{id}, $s->{release_date}, $s->{update_date}, );
 
-    for my $property_name ( @fixed_p_headers, @dynamic_p_headers ) {
+    for my $property_name ( @p_headers ) {
       my $vals = $s->{properties}{$property_name};
 
       if ($vals) {
@@ -323,7 +368,7 @@ sub tsv_output {
           map {
             $_->{value}
               . (
-                ( $_->{unit} && !$units_to_elide{ $_->{unit} } )
+                ( $_->{unit} && !$units_to_omit{ $_->{unit} } )
               ? ( ' ' . $_->{unit} )
               : ''
               )
@@ -441,6 +486,21 @@ sub fetch_sample_ids_in_group {
   my $group = BioSD::fetch_group($group_id);
   confess "Group $group_id was not found" unless $group;
   return $group->sample_ids;
+}
+
+sub load_tsv_columns {
+  my ($tsv_column_file) = @_;
+
+  my @tsv_columns;
+  open my $fh, '<', $tsv_column_file;
+  while (<$fh>) {
+    chomp;
+    push @tsv_columns, split /\t/;
+  }
+
+  close $fh;
+
+  return @tsv_columns;
 }
 
 sub perldocs {
