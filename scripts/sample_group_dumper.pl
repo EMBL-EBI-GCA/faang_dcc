@@ -127,7 +127,9 @@ $source_options++ if ( $search_tag_value && $search_tag_field );
 $source_options++ if ($json_source);
 $source_options++ if ($sample_group_id);
 
-croak "Need a source of sample information, specify either -sample_group_id, -search_tag_field and -search_tag_value, or -json_source" unless ($source_options == 1);
+croak
+"Need a source of sample information, specify either -sample_group_id, -search_tag_field and -search_tag_value, or -json_source"
+  unless ( $source_options == 1 );
 
 croak "please specify -output_format $output_format_string"
   unless ( $output_format && any { $_ eq $output_format }
@@ -143,17 +145,17 @@ if ($json_source) {
 }
 else {
   my $project_sample_ids;
-  
-  if ($sample_group_id){
+
+  if ($sample_group_id) {
     $project_sample_ids = fetch_sample_ids_in_group($sample_group_id);
   }
-  elsif (defined $search_tag_field && defined $search_tag_value) {
-    $project_sample_ids = fetch_sample_ids_matching_tag_and_value( $search_tag_field,
-    $search_tag_value );
+  elsif ( defined $search_tag_field && defined $search_tag_value ) {
+    $project_sample_ids =
+      fetch_sample_ids_matching_tag_and_value( $search_tag_field,
+      $search_tag_value );
   }
-    
 
-  $samples = biosample_id_to_sample_hash( $project_sample_ids);
+  $samples = biosample_id_to_sample_hash($project_sample_ids);
 }
 
 #section 2, in which we may fiddle around with the data
@@ -161,7 +163,6 @@ else {
 cleanup_submission_dates($samples) if ($cleanup_submission_dates);
 
 inherit_values($samples) if ($inherit_attributes);
-
 
 #section 3, in which we output
 
@@ -237,12 +238,11 @@ sub derived_sample_chain {
     $sample_ids_seen->{$df_id} = 1;
 
     my $sample_derived_from = $samples_by_id->{$df_id};
-    
-    if (!$sample_derived_from) {
+
+    if ( !$sample_derived_from ) {
       $sample_derived_from = biosample_id_to_sample_hash($df_id);
     }
-    
-    
+
     push @sample_chain, $sample_derived_from;
 
     if ( @{ $sample_derived_from->{derived_from} } ) {
