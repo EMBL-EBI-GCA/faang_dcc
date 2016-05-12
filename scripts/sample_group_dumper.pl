@@ -21,24 +21,41 @@ faang_dcc/scripts/sample_group_dumper.pl
 
 =head1 SYNOPSIS
 
-This script will search for BioSamples entries tagged "project: FAANG" and dump them as JSON or tsv
+This script will search for BioSamples entries and dump information to JSON or TSV
 
 =head1 OPTIONS
 
-  -help, binary flag to print out the perl docs
-  -output_file <path>, path where output will be written
-  -output_format <json|tsv>, how to format the output 
-  -inherit_attributes, binary flag, should attributes be inherited via 'Derived from' relationships
-  -json_source <json file>, use the json output of this script as the data source for this script - useful for multi step processing
+=head2 SOURCE DATA
 
-  You probably don't want to change the following:
+Use either -sample_group_id, -search_tag_field and -search_tag_value, or -json_source
+
+  -sample_group_id, BioSamples group id to fetch samples from
   -search_tag_field, which property should we check when searching for eligible samples. defaults to project
   -search_tag_value, what value should the tag field have if a sample is eligble. defaults to FAANG
+  -json_source <json file>, use the json output of this script as the data source for this script - useful for multi step processing
+
+
+=head2 OUTPUT
+
+  -output_file <path>, path where output will be written
+  -output_format <json|tsv>, how to format the output 
+
+=head2 TSV formatting
+
   -col_sep string to separate columns in tsv, defaults to tab
   -line_sep string to separate lines in tsv, defaults to newline (\n)
   -value_sep string to separate values in tsv, where there are multiple values for a single header
   -empty_value string to use where a cell does not have a value in tsv, defaults to an empty string
-  -elide_units units matching these values in this list will not be included in tsv output. By default YYYY-MM-DD, YYYY-MM and YYYY are elided, other units are included in value column
+  -omit_units units matching these values in this list will not be included in tsv output. By default YYYY-MM-DD, YYYY-MM and YYYY are elided, other units are included in value column
+
+=head2 DATA PROCESSING
+
+  -inherit_attributes, binary flag, should attributes be inherited via 'Derived from' relationships
+  -cleanup_submission_dates, binary flag, should we strip the time from submission release and update fields
+
+=head2 MISC
+
+  -help, binary flag to print out the perl docs
 
 =cut
 
@@ -56,11 +73,13 @@ use Carp;
 
 my @valid_output_formats = qw(json tsv);
 my $output_format_string = join( '|', @valid_output_formats );
-
-my $search_tag_field = 'project';
-my $search_tag_value = 'FAANG';
-my $output_format    = 'json';
+my $output_format        = 'json';
 my $output;
+my $search_tag_field;
+my $search_tag_value;
+my $json_source;
+my $sample_group_id;
+
 my $inherit_attributes;
 my $help;
 
@@ -70,30 +89,45 @@ my $value_sep   = ";";
 my $empty_value = '';
 
 my $cleanup_submission_dates = 1;
-my $json_source;
 
-my @elide_units = qw(YYYY YYYY-MM YYYY-MM-DD);
+my @omit_units = qw(YYYY YYYY-MM YYYY-MM-DD);
 
 GetOptions(
-  "search_tag_field=s"       => \$search_tag_field,
-  "search_tag_value=s"       => \$search_tag_value,
-  "output_format=s"          => \$output_format,
-  "inherit_attributes"       => \$inherit_attributes,
-  "output=s"                 => \$output,
-  "col_sep=s"                => \$col_sep,
-  "line_sep=s"               => \$line_sep,
-  "value_sep=s"              => \$value_sep,
-  "empty_value=s"            => \$empty_value,
+
+  #source
+  "json_source=s"      => \$json_source,
+  "search_tag_field=s" => \$search_tag_field,
+  "search_tag_value=s" => \$search_tag_value,
+  "sample_group_id=s"  => \$sample_group_id,
+
+  #output
+  "output_format=s" => \$output_format,
+  "output=s"        => \$output,
+
+  #tsv specific output
+  "col_sep=s"       => \$col_sep,
+  "line_sep=s"      => \$line_sep,
+  "value_sep=s"     => \$value_sep,
+  "empty_value=s"   => \$empty_value,
+  "units_to_omit=s" => \@omit_units,
+
+  #processing
   "cleanup_submission_dates" => \$cleanup_submission_dates,
-  "elide_units=s"            => \@elide_units,
-  "json_source=s"            => \$json_source,
-  "help"                     => \$help,
+  "inherit_attributes"       => \$inherit_attributes,
+
+  #misc
+  "help" => \$help,
 );
 
 perldocs() if $help;
 
-croak "Need search_tag_field and search_tag_value"
-  unless $search_tag_value && $search_tag_field;
+my $source_options = 0;
+
+$source_options++ if ( $search_tag_value && $search_tag_field );
+$source_options++ if ($json_source);
+$source_options++ if ($sample_group_id);
+
+croak "Need a source of sample information, specify either -sample_group_id, -search_tag_field and -search_tag_value, or -json_source" unless ($source_options == 1);
 
 croak "please specify -output_format $output_format_string"
   unless ( $output_format && any { $_ eq $output_format }
@@ -101,24 +135,35 @@ croak "please specify -output_format $output_format_string"
 croak "please specify -output <file>" if ( $output_format && !$output );
 
 my $samples;
-if ($json_source){
+
+#section 1, in which we shall find some samples
+
+if ($json_source) {
   $samples = load_from_json($json_source);
 }
 else {
-  #1. fetch all samples matching 'project: FAANG' (search by FAANG, check for having property 'project' with value ‘FAANG’ and were submitted directly to BioSamples)
-  #TODO use the sample group ID once it's working correctly.
-  my $project_sample_ids =
-    fetch_sample_ids_matching_tag_and_value( $search_tag_field,
+  my $project_sample_ids;
+  
+  if ($sample_group_id){
+    $project_sample_ids = fetch_sample_ids_in_group($sample_group_id);
+  }
+  elsif (defined $search_tag_field && defined $search_tag_value) {
+    $project_sample_ids = fetch_sample_ids_matching_tag_and_value( $search_tag_field,
     $search_tag_value );
+  }
+    
 
-  #2.
-
-  $samples = convert_to_hashes( $project_sample_ids, $inherit_attributes );
+  $samples = biosample_id_to_sample_hash( $project_sample_ids);
 }
-cleanup_submission_dates( $samples ) if ($cleanup_submission_dates);
+
+#section 2, in which we may fiddle around with the data
+
+cleanup_submission_dates($samples) if ($cleanup_submission_dates);
+
+inherit_values($samples) if ($inherit_attributes);
 
 
-inherit_values( $samples ) if ($inherit_attributes);
+#section 3, in which we output
 
 my ( $fh, $close_fh );
 if ( $output eq 'stdout' || $output eq '-' ) {
@@ -141,26 +186,26 @@ close($fh) if ($close_fh);
 
 sub load_from_json {
   my ($file) = @_;
-  
+
   my $x;
-  my ($fh,$close_fh);
-  
-  if ($file eq '-' || $file eq 'stdin'){
+  my ( $fh, $close_fh );
+
+  if ( $file eq '-' || $file eq 'stdin' ) {
     $fh = *STDIN;
   }
-  else{
+  else {
     open $fh, '<', $file;
     $close_fh = 1;
   }
-  
-  while (<$fh>){
+
+  while (<$fh>) {
     $x .= $_;
   }
-  
+
   close $fh if $close_fh;
-  
+
   my $samples = JSON->new->decode($x);
-  
+
   return $samples;
 }
 
@@ -192,6 +237,12 @@ sub derived_sample_chain {
     $sample_ids_seen->{$df_id} = 1;
 
     my $sample_derived_from = $samples_by_id->{$df_id};
+    
+    if (!$sample_derived_from) {
+      $sample_derived_from = biosample_id_to_sample_hash($df_id);
+    }
+    
+    
     push @sample_chain, $sample_derived_from;
 
     if ( @{ $sample_derived_from->{derived_from} } ) {
@@ -250,7 +301,7 @@ sub tsv_output {
     map { $property_names{$_} = 1 } keys %{ $s->{properties} };
   }
 
-  my %units_to_elide = map { $_ => 1 } @elide_units;
+  my %units_to_elide = map { $_ => 1 } @omit_units;
 
   my @dynamic_p_headers =
     dynamic_property_headers( $samples, \@fixed_p_headers );
@@ -271,9 +322,11 @@ sub tsv_output {
           $value_sep,
           map {
             $_->{value}
-              . ( ( $_->{unit} && !$units_to_elide{ $_->{unit} } )
+              . (
+                ( $_->{unit} && !$units_to_elide{ $_->{unit} } )
               ? ( ' ' . $_->{unit} )
-              : '' )
+              : ''
+              )
           } @$vals
         );
         push @vals, $v // $empty_value;
@@ -306,7 +359,7 @@ sub dynamic_property_headers {
   return @dynamic_p_headers;
 }
 
-sub convert_to_hashes {
+sub biosample_id_to_sample_hash {
   my ( $sample_ids, $inherit_attributes ) = @_;
   my @samples;
 
@@ -323,6 +376,7 @@ sub convert_to_hashes {
     push @samples, $sample;
 
     my $biosd_sample = BioSD::fetch_sample($sample_id);
+    confess "could not find biosample for $sample_id" unless $biosd_sample;
 
     $sample->{release_date} = $biosd_sample->submission_release_date;
     $sample->{update_date}  = $biosd_sample->submission_update_date;
@@ -360,9 +414,9 @@ sub convert_to_hashes {
     }
 
   }
-  
+
   @samples = sort { $a->{id} cmp $b->{id} } @samples;
-  
+
   return \@samples;
 }
 
@@ -380,6 +434,13 @@ sub fetch_sample_ids_matching_tag_and_value {
 
       } @$samples
   ];
+}
+
+sub fetch_sample_ids_in_group {
+  my ($group_id) = @_;
+  my $group = BioSD::fetch_group($group_id);
+  confess "Group $group_id was not found" unless $group;
+  return $group->sample_ids;
 }
 
 sub perldocs {
