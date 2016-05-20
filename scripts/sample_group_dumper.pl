@@ -77,6 +77,8 @@ use JSON;
 use Data::Dumper;
 use Getopt::Long;
 use Carp;
+use ReseqTrack::DBSQL::DBAdaptor;
+
 
 my @valid_output_formats = qw(json tsv);
 my $output_format_string = join( '|', @valid_output_formats );
@@ -97,6 +99,7 @@ my $empty_value = '';
 my @omit_units  = qw(YYYY YYYY-MM YYYY-MM-DD);
 my @tsv_columns;
 my $tsv_column_file;
+my %rst_db;
 
 my $pretty_json;
 
@@ -109,6 +112,12 @@ GetOptions(
   "search_tag_field=s" => \$search_tag_field,
   "search_tag_value=s" => \$search_tag_value,
   "sample_group_id=s"  => \$sample_group_id,
+  
+  "dbhost=s" => \$rst_db{-host},
+  "dbuser=s" => \$rst_db{-user},
+  "dbpass=s" => \$rst_db{-pass},
+  "dbport=s" => \$rst_db{-port},
+  "dbname=s" => \$rst_db{-name},
 
   #output
   "output_format=s" => \$output_format,
@@ -141,15 +150,23 @@ my $source_options = 0;
 $source_options++ if ( $search_tag_value && $search_tag_field );
 $source_options++ if ($json_source);
 $source_options++ if ($sample_group_id);
+$source_options++ if (scalar(keys %rst_db) eq 4);
 
 croak
-"Need a source of sample information, specify either -sample_group_id, -search_tag_field and -search_tag_value, or -json_source"
+"Need a source of sample information, specify either -sample_group_id, -search_tag_field and -search_tag_value, -json_source, or all of the following: -dbhost -dbuser -dbpass  -dbport -dbname "
   unless ( $source_options == 1 );
 
 croak "please specify -output_format $output_format_string"
   unless ( $output_format && any { $_ eq $output_format }
   @valid_output_formats );
 croak "please specify -output <file>" if ( $output_format && !$output );
+
+my $rst;
+if (scalar(keys %rst_db) eq 4){
+  $rst = ReseqTrack::DBSQL::DBAdaptor->new(%rst_db);
+  
+  croak "could not connect to reseqtrack db" unless ($rst);
+}
 
 @tsv_columns = load_tsv_columns($tsv_column_file) if ($tsv_column_file);
 
@@ -170,6 +187,9 @@ else {
     $project_sample_ids =
       fetch_sample_ids_matching_tag_and_value( $search_tag_field,
       $search_tag_value );
+  }
+  elsif ($rst){
+    $project_sample_ids = fetch_biosample_ids_from_rst($rst);
   }
 
   $samples = biosample_id_to_sample_hash($project_sample_ids);
@@ -486,6 +506,14 @@ sub fetch_sample_ids_in_group {
   my $group = BioSD::fetch_group($group_id);
   confess "Group $group_id was not found" unless $group;
   return $group->sample_ids;
+}
+
+sub fetch_biosample_ids_from_rst {
+  my ($rst) = @_;
+  my $sa = $rst->get_SampleAdaptor;
+  my $samples = $sa->fetch_all();
+  my @biosample_ids = grep {defined $_} map {$_->biosample_id} @$samples;
+  return \@biosample_ids;
 }
 
 sub load_tsv_columns {
