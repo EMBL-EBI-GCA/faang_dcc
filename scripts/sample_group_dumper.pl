@@ -143,12 +143,20 @@ GetOptions(
 
 perldocs() if $help;
 
+my $got_rst_args = (
+  defined $rst_db{-host}  &&
+  defined $rst_db{-user}  &&
+  defined $rst_db{-pass}  &&
+  defined $rst_db{-port}  &&
+  defined $rst_db{-dbname}  
+);
+
 my $source_options = 0;
 
 $source_options++ if ( $search_tag_value && $search_tag_field );
 $source_options++ if ($json_source);
 $source_options++ if ($sample_group_id);
-$source_options++ if (scalar(keys %rst_db) eq 5);
+$source_options++ if ($got_rst_args);
 
 croak
 "Need a source of sample information, specify either -sample_group_id, -search_tag_field and -search_tag_value, -json_source, or all of the following: -dbhost -dbuser -dbpass  -dbport -dbname "
@@ -160,9 +168,9 @@ croak "please specify -output_format $output_format_string"
 croak "please specify -output <file>" if ( $output_format && !$output );
 
 my $rst;
-if (scalar(keys %rst_db) eq 5){
+if ($got_rst_args){
   require ReseqTrack::DBSQL::DBAdaptor;
-  
+
   $rst = ReseqTrack::DBSQL::DBAdaptor->new(%rst_db);
   
   croak "could not connect to reseqtrack db" unless ($rst);
