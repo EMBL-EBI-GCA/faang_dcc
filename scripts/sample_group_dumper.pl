@@ -77,8 +77,6 @@ use JSON;
 use Data::Dumper;
 use Getopt::Long;
 use Carp;
-use ReseqTrack::DBSQL::DBAdaptor;
-
 
 my @valid_output_formats = qw(json tsv);
 my $output_format_string = join( '|', @valid_output_formats );
@@ -163,6 +161,8 @@ croak "please specify -output <file>" if ( $output_format && !$output );
 
 my $rst;
 if (scalar(keys %rst_db) eq 5){
+  require ReseqTrack::DBSQL::DBAdaptor;
+  
   $rst = ReseqTrack::DBSQL::DBAdaptor->new(%rst_db);
   
   croak "could not connect to reseqtrack db" unless ($rst);
