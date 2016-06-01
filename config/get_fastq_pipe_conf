@@ -1,0 +1,12 @@
+[GetProjectFastq]
+table_name=run
+config_module=ReseqTrack::Hive::PipeConfig::GetFastq_conf
+config_options=-era_dbpass ***************
+config_options=-era_dbuser ops\$laura
+config_options=-root_output_dir /hps/cstor01/nobackup/faang/davidr/fastqs/working
+config_options=-fastq_output_dir /hps/cstor01/nobackup/faang/davidr/fastqs
+config_options=-fastq_type FASTQ
+config_options=-lsf_queue production-rh6
+config_options=-era_dbname ERAPRO
+config_options=-clobber 1
+config_options=-get_fastq_module ReseqTrack::Tools::GetFastq::ENAFtp
