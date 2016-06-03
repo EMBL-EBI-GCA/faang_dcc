@@ -1,0 +1,228 @@
+
+=head1 NAME
+
+ ReseqTrack::Hive::PipeConfig::ErsaDataDelivery_conf
+
+=head1 SYNOPSIS
+
+  Pipeline must be seeded by the collection table of a ReseqTrack database
+  e.g. use the seeding module ReseqTrack::Hive::PipeSeed::BasePipeSeed with table set to collection
+
+  Here is an example pipeline configuration to load using reseqtrack/scripts/pipeline/load_pipeline_from_conf.pl
+
+[ERSA data delivery]
+table_name=collction
+config_module=ReseqTrack::Hive::PipeConfig::ErsaDataDelivery_conf
+  
+
+  Options that have defaults but you will often want to set them in your pipeline.cofig_options table/column:
+
+      -seeding_module, (default is ReseqTrack::Hive::PipeSeed::BasePipeSeed) override this with a project-specific module
+      -seeding_options, hashref passed to the seeding module.  Override the defaults only if using a different seeding module.
+
+      -sample_columns, default is ['sample_source_id', 'sample_alias'].
+      -run_columns, default is ['run_source_id', 'run_source_id'],
+      -study_columns, default is ['study_source_id']
+      -experiment_columns, -sample attributes, -run_attributes, -experiment_attributes, study_attributes, default is [] for each one.
+            These parameters define what meta information parameters are added to the flow of information around the hive pipeline
+            Add to these arrays if your pipeline uses any extra meta information, e.g. when naming the final output files.
+            e.g. for 1000genomes project you might want -sample_attributes POPULATION
+
+      -require_run_columns, default is { status => ['public'], }
+      -exlude_run_columns, -require_run_attributes, -exclude_run_attributes, default is {} for each one of these
+            Use these hashrefs to control what runs are used to seed the pipeline
+            e.g. -require_run_columns instrument_platform=ILLUMINA
+            e.g. -exclude_run_attributes BASE_COUNT=0
+
+      -root_output_dir, (default is your current directory) This is where manifest files go
+
+  Options that are required, but will be passed in by reseqtrack/scripts/init_pipeline.pl:
+
+      -pipeline_db -host=???
+      -pipeline_db -port=???
+      -pipeline_db -user=???
+      -dipeline_db -dbname=???
+      -reseqtrack_db -host=???
+      -reseqtrack_db -user=???
+      -reseqtrack_db -port=???
+      -reseqtrack_db -pass=???
+
+=cut
+
+package ReseqTrack::Hive::PipeConfig::ErsaDataDelivery_conf;
+
+use strict;
+use warnings;
+
+use base ('ReseqTrack::Hive::PipeConfig::ReseqTrackGeneric_conf');
+
+sub default_options {
+  my ($self) = @_;
+
+  return {
+    %{ $self->SUPER::default_options() }
+    ,    # inherit other stuff from the base class
+
+    pipeline_name =>
+      'ersa_dump',  # name used by the beekeeper to prefix job names on the farm
+
+    #output
+    collection_columns    => [ 'name', 'type' ],
+    collection_attributes => [],
+    file_columns          => [ 'name', 'md5' ],
+    file_attributes       => [],
+
+    sample_attribute_keys     => [],
+    sample_columns            => ['biosample_id'],
+    run_attribute_keys        => [],
+    run_columns               => ['run_source_id'],
+    study_attribute_keys      => [],
+    study_columns             => ['study_source_id'],
+    experiment_attribute_keys => [ 'experiment target', 'assay type' ],
+    experiment_columns =>
+      [ 'experiment_source_id', 'library_strategy', 'library_layout' ],
+
+    biosample_attribute_keys => [],
+
+    #filtering
+    fastq_collection_type       => 'FASTQ',
+    fastq_collection_table_name => 'file',
+
+    require_collection_columns => {
+      type       => $self->o('fastq_collection_type'),
+      table_name => $self->o('fastq_collection_table_name')
+    },
+    exclude_collection_columns    => {},
+    exclude_collection_attributes => {},
+    require_collection_attributes => {},
+
+    require_run_columns    => { status => ['public'], },
+    require_run_attributes => {},
+    exclude_run_attributes => {},
+    exclude_run_columns    => {},
+
+    require_experiment_columns    => { status => ['public'], },
+    require_experiment_attributes => {},
+    exclude_experiment_attributes => {},
+    exclude_experiment_columns    => {},
+
+    require_study_columns    => { status => ['public'], },
+    require_study_attributes => {},
+    exclude_study_attributes => {},
+    exclude_study_columns    => {},
+
+    require_sample_columns    => { status => ['public'], },
+    require_sample_attributes => {},
+    exclude_sample_attributes => {},
+    exclude_sample_columns    => {},
+
+    seeding_module  => 'ReseqTrack::Hive::PipeSeed::FaangErsaDump',
+    seeding_options => {
+
+      #output of collection
+      output_columns    => $self->o('collection_columns'),
+      output_attributes => $self->o('collection_attributes'),
+
+      #filtering collection
+      require_columns    => $self->o('require_collection_columns'),
+      exclude_columns    => $self->o('exclude_collection_columns'),
+      require_attributes => $self->o('require_collection_attributes'),
+      exclude_attributes => $self->o('exclude_collection_attributes'),
+
+      #filtering by ena metadata
+      require_run_columns    => $self->o('require_run_columns'),
+      require_run_attributes => $self->o('require_run_attributes'),
+      exclude_run_attributes => $self->o('exclude_run_attributes'),
+      exclude_run_columns    => $self->o('exclude_run_columns'),
+
+      require_experiment_columns => $self->o('require_experiment_columns'),
+      require_experiment_attributes =>
+        $self->o('require_experiment_attributes'),
+      exclude_experiment_attributes =>
+        $self->o('exclude_experiment_attributes'),
+      exclude_experiment_columns => $self->o('exclude_experiment_columns'),
+
+      require_sample_columns    => $self->o('require_sample_columns'),
+      require_sample_attributes => $self->o('require_sample_attributes'),
+      exclude_sample_attributes => $self->o('exclude_sample_attributes'),
+      exclude_sample_columns    => $self->o('exclude_sample_columns'),
+
+      require_study_columns    => $self->o('require_study_columns'),
+      require_study_attributes => $self->o('require_study_attributes'),
+      exclude_study_attributes => $self->o('exclude_study_attributes'),
+      exclude_study_columns    => $self->o('exclude_study_columns'),
+
+      #output of things linked to collection
+      output_file_columns    => $self->o('file_columns'),
+      output_file_attributes => $self->o('file_attributes'),
+
+      output_run_columns           => $self->o('run_columns'),
+      output_run_attributes        => $self->o('run_attribute_keys'),
+      output_experiment_columns    => $self->o('experiment_columns'),
+      output_experiment_attributes => $self->o('experiment_attribute_keys'),
+      output_sample_columns        => $self->o('sample_columns'),
+      output_sample_attributes     => $self->o('sample_attribute_keys'),
+      output_study_columns         => $self->o('study_columns'),
+      output_study_attributes      => $self->o('study_attribute_keys'),
+
+      output_biosample_attribute_keys => $self->o('biosample_attribute_keys'),
+    },
+
+  };
+}
+
+sub resource_classes {
+  my ($self) = @_;
+  return {
+    %{ $self->SUPER::resource_classes }
+    ,    # inherit 'default' from the parent class
+    '200Mb' => {
+          'LSF' => '-C0 -M200 -q '
+        . $self->o('lsf_queue')
+        . ' -R"select[mem>200] rusage[mem=200]"'
+    },
+    '400Mb' => {
+          'LSF' => '-C0 -M400 -q '
+        . $self->o('lsf_queue')
+        . ' -R"select[mem>400] rusage[mem=400]"'
+    },
+  };
+}
+
+sub pipeline_wide_parameters {
+  my ($self) = @_;
+  return { %{ $self->SUPER::pipeline_wide_parameters }, };
+}
+
+sub pipeline_analyses {
+  my ($self) = @_;
+
+  my @analyses;
+  push(
+    @analyses,
+    {
+      -logic_name  => 'get_seeds',
+      -module      => 'ReseqTrack::Hive::Process::SeedFactory',
+      -meadow_type => 'LOCAL',
+      -parameters  => {
+        seeding_module  => $self->o('seeding_module'),
+        seeding_options => $self->o('seeding_options'),
+      },
+      -analysis_capacity => 1,    # use per-analysis limiter
+      -flow_into => { 2 => ['mark_seed_complete'], },
+    }
+  );
+  push(
+    @analyses,
+    {
+      -logic_name  => 'mark_seed_complete',
+      -module      => 'ReseqTrack::Hive::Process::UpdateSeed',
+      -parameters  => { is_complete => 1, },
+      -meadow_type => 'LOCAL',
+    }
+  );
+
+  return \@analyses;
+}
+
+1;
