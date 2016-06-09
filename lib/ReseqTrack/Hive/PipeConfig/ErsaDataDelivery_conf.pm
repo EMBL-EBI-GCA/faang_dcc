@@ -65,6 +65,8 @@ sub default_options {
 
     pipeline_name =>
       'ersa_dump',  # name used by the beekeeper to prefix job names on the farm
+    biosample_data_file => '/homes/davidr/perl_code/faang_test/samples.json',
+    manifest_output_dir => '/hps/cstor01/nobackup/faang/davidr/ersa_delivery',
 
     #output
     collection_columns    => [ 'name', 'type' ],
@@ -72,17 +74,25 @@ sub default_options {
     file_columns          => [ 'name', 'md5' ],
     file_attributes       => [],
 
-    sample_attribute_keys     => [],
-    sample_columns            => ['biosample_id'],
-    run_attribute_keys        => [],
-    run_columns               => ['run_source_id'],
-    study_attribute_keys      => [],
-    study_columns             => ['study_source_id'],
+    sample_attribute_keys => [],
+    sample_columns        => ['biosample_id'],
+
+    run_attribute_keys => [],
+    run_columns        => [ 'run_source_id', 'center_name', 'run_center_name' ],
+
+    study_attribute_keys => [],
+    study_columns        => ['study_source_id'],
+
     experiment_attribute_keys => [ 'experiment target', 'assay type' ],
     experiment_columns =>
       [ 'experiment_source_id', 'library_strategy', 'library_layout' ],
 
-    biosample_attribute_keys => [],
+    biosample_attributes => [
+      'Sample Name', 'Organism', 'Sex', 'material', 'breed', 'organism part',
+      'cell type',
+      'health status at collection',
+      'developmental stage'
+    ],
 
     #filtering
     fastq_collection_type       => 'FASTQ',
@@ -101,7 +111,11 @@ sub default_options {
     exclude_run_attributes => {},
     exclude_run_columns    => {},
 
-    require_experiment_columns    => { status => ['public'], },
+    require_experiment_columns => {
+      status              => ['public'],
+      library_strategy    => ['ChIP-Seq'],
+      instrument_platform => ['ILLUMINA'],
+    },
     require_experiment_attributes => {},
     exclude_experiment_attributes => {},
     exclude_experiment_columns    => {},
@@ -116,8 +130,21 @@ sub default_options {
     exclude_sample_attributes => {},
     exclude_sample_columns    => {},
 
+    require_biosample_attributes => {
+      Organism =>
+        [ #TODO consider expanding this to include sub-species, e.g. sus scrofa domesticus
+        { term_source_id => 9913 },    #bos taurus
+        { term_source_id => 9031 },    #gallus gallus
+        { term_source_id => 9796 },    #equus caballus
+        { term_source_id => 9823 },    #sus scrofa
+        { term_source_id => 9940 },    #ovis aries
+        ]
+    },
+    exclude_biosample_attributes => {},
+
     seeding_module  => 'ReseqTrack::Hive::PipeSeed::FaangErsaDump',
     seeding_options => {
+      biosample_data_file => $self->o('biosample_data_file'),
 
       #output of collection
       output_columns    => $self->o('collection_columns'),
@@ -152,6 +179,11 @@ sub default_options {
       exclude_study_attributes => $self->o('exclude_study_attributes'),
       exclude_study_columns    => $self->o('exclude_study_columns'),
 
+      #filtering by biosample metadata
+      output_biosample_attributes  => $self->o('biosample_attributes'),
+      require_biosample_attributes => $self->o('require_biosample_attributes'),
+      exclude_biosample_attributes => $self->o('exclude_biosample_attributes'),
+
       #output of things linked to collection
       output_file_columns    => $self->o('file_columns'),
       output_file_attributes => $self->o('file_attributes'),
@@ -164,8 +196,6 @@ sub default_options {
       output_sample_attributes     => $self->o('sample_attribute_keys'),
       output_study_columns         => $self->o('study_columns'),
       output_study_attributes      => $self->o('study_attribute_keys'),
-
-      output_biosample_attribute_keys => $self->o('biosample_attribute_keys'),
     },
 
   };
@@ -209,9 +239,24 @@ sub pipeline_analyses {
         seeding_options => $self->o('seeding_options'),
       },
       -analysis_capacity => 1,    # use per-analysis limiter
-      -flow_into => { 2 => ['mark_seed_complete'], },
+      -flow_into         => {
+        '2->A' => ['test_fan'],
+        'A->1' => ['write_registration_manifest']
+      },
     }
   );
+
+  push(
+    @analyses,
+    {
+      -logic_name  => 'test_fan',
+      -module      => 'Bio::EnsEMBL::Hive::RunnableDB::Dummy',
+      -meadow_type => 'LOCAL',
+      -flow_into => { 1 => [ 'mark_seed_complete', ':////accu?ersa_dump=[]' ] }
+
+    }
+  );
+
   push(
     @analyses,
     {
@@ -219,6 +264,32 @@ sub pipeline_analyses {
       -module      => 'ReseqTrack::Hive::Process::UpdateSeed',
       -parameters  => { is_complete => 1, },
       -meadow_type => 'LOCAL',
+
+    }
+  );
+
+  push(
+    @analyses,
+    {
+      -logic_name  => 'write_registration_manifest',
+      -module      => 'ReseqTrack::Hive::Process::ErsaDumpWriter',
+      -meadow_type => 'LOCAL',
+      -parameters  => {
+        manifest_output_dir =>
+          '/hps/cstor01/nobackup/faang/davidr/ersa_delivery',
+        source_param_name               => 'ersa_dump',
+        output_filename_core_param_name => 'seed_time',
+        output_filename_prefix          => 'ersa_dump_',
+        output_filename_suffix          => '.csv',
+        output_column_delimiter         => ',',
+        ontology_attributes             => {
+          SAMPLE => [ 'Sex',           'breed', 'material' ],
+          TISSUE => [ 'organism part', 'cell type' ],
+          CONDITION => [ 'health status at collection', 'developmental stage' ],
+        },
+        output_project_prefix            => 'FAANG-',
+        output_project_suffix_param_name => 'study_source_id'
+      }
     }
   );
 
