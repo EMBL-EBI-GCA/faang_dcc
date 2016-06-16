@@ -3,10 +3,12 @@ package ReseqTrack::Hive::PipeSeed::FaangErsaDump;
 use strict;
 use warnings;
 use ReseqTrack::Tools::Exception qw(throw);
-use List::Util qw(any none);
+use List::Util qw(any none first);
 use autodie;
 use JSON::MaybeXS;
 use base ('ReseqTrack::Hive::PipeSeed::CollectionFiles');
+use Data::Dumper;
+use Bio::Metadata::Entity;
 
 sub create_seed_params {
   my ($self) = @_;
@@ -23,6 +25,8 @@ sub create_seed_params {
   my $output_parameter_name = $options->{'output_parameter_name'}
     || 'ersa_dump';
 
+  my $input_run_id_lookups = $self->load_run_input_lookup();
+
   my %run_conditions = (
     adaptor            => $ra,
     output_columns     => $self->option_array('output_run_columns'),
@@ -32,7 +36,6 @@ sub create_seed_params {
     require_columns    => $options->{'require_run_columns'} || {},
     exclude_columns    => $options->{'exclude_run_columns'} || {},
   );
-
   my %experiment_conditions = (
     adaptor            => $db->get_ExperimentAdaptor,
     output_columns     => $self->option_array('output_experiment_columns'),
@@ -74,14 +77,16 @@ sub create_seed_params {
 
   my $received_seed_params = $self->seed_params;
   my @approved_seed_params;
-  $self->seed_params( \@approved_seed_params );
 
 SEED:
   for my $seed_params (@$received_seed_params) {
     my ( $collection, $output_hash ) = @$seed_params;
 
+    my $run_source_id = $collection->name;
+
     #get objects
-    my $run = $ra->fetch_by_source_id( $collection->name );
+
+    my $run = $ra->fetch_by_source_id($run_source_id);
 
     throw( "Cannot find run for collection with name " . $collection->name )
       unless ($run);
@@ -92,7 +97,13 @@ SEED:
 
     my $biosample_id = $sample->biosample_id;
 
+    #runs can have input
+    my $input_run_id =
+      first { $_ } map { $_->{$run_source_id} } @$input_run_id_lookups;
+    $output_hash->{input_run_id} = $input_run_id;
+
     my $biosample = $biosample_entries_by_id->{ $sample->biosample_id };
+    next SEED unless $biosample;    #TODO temp fix while testing
     throw( "Cannot find biosample entry $biosample_id for sample "
         . $sample->sample_source_id )
       unless $biosample;
@@ -105,12 +116,16 @@ SEED:
       %biosample_conditions
     );
 
+    next SEED unless $match;
+
     $match = $self->filter_and_update_output(
       output_hash => $output_hash,
       object      => $run,
       %run_conditions
     );
+
     next SEED unless $match;
+
     $match = $self->filter_and_update_output(
       output_hash => $output_hash,
       object      => $experiment,
@@ -118,6 +133,7 @@ SEED:
     );
 
     next SEED unless $match;
+
     $match = $self->filter_and_update_output(
       output_hash => $output_hash,
       object      => $sample,
@@ -130,13 +146,8 @@ SEED:
       object      => $study,
       %study_conditions
     );
-    next SEED unless $match;
 
-    $match = $self->filter_and_update_output_by_biosample(
-      output_hash => $output_hash,
-      biosample   => $biosample,
-      %biosample_conditions,
-    );
+    next SEED unless $match;
 
     if ($match) {
       $self->rewrite_output_hash( $output_parameter_name, $output_hash )
@@ -145,6 +156,8 @@ SEED:
     }
 
   }
+  $self->seed_params( \@approved_seed_params );
+
 }
 
 sub rewrite_output_hash {
@@ -160,10 +173,8 @@ sub rewrite_output_hash {
 
 }
 
-sub load_biosamples_entries {
-  my ($self) = @_;
-
-  my $src_file = $self->options()->{biosample_data_file};
+sub load_json {
+  my ( $self, $src_file ) = @_;
 
   open my $fh, '<', $src_file;
 
@@ -173,17 +184,36 @@ sub load_biosamples_entries {
     $buffer = <$fh>;
   }
   close $fh;
+  return decode_json $buffer;
+}
 
-  my %samples_by_id;
+sub load_run_input_lookup {
+  my ($self) = @_;
 
-  my $sample_array = decode_json $buffer;
+  my @lookup_hashes;
+
+  my $srcs = $self->options()->{run_input_lookup_files};
+
+  for my $src_file (@$srcs) {
+    push @lookup_hashes, $self->load_json($src_file);
+  }
+
+  return \@lookup_hashes;
+}
+
+sub load_biosamples_entries {
+  my ($self) = @_;
+
+  my $src_file = $self->options()->{biosample_data_file};
+
+  my $sample_array = $self->load_json($src_file);
 
   throw("json sample file $src_file should decode to an array")
     if ( !$sample_array || !ref $sample_array || ref $sample_array ne 'ARRAY' );
 
-  for my $sample_hash (@$sample_array) {
-    $samples_by_id{ $sample_hash->{id} } = $sample_hash;
-  }
+  my %samples_by_id =
+    map { $_->id() => $_ }
+    map { Bio::Metadata::Entity->new($_) } @$sample_array;
 
   return \%samples_by_id;
 }
@@ -208,21 +238,24 @@ sub filter_and_update_output {
 
   #filter columns
   #require
-  for my $column_name ( keys %$require_attributes ) {
+  for my $column_name ( keys %$require_columns ) {
     throw( "no column mapping for $column_name from " . ref($adaptor) )
       unless $column_mappings->{$column_name};
-    my $match_values = $require_attributes->{$column_name};
+
+    my $match_values = $require_columns->{$column_name};
     my $value        = &{ $column_mappings->{$column_name} }();
-    return undef if none { $value eq $_ } @$match_values;
+    my $fail         = none { $value eq $_ } @$match_values;
+    return undef if $fail;
   }
 
   #exclude
-  for my $column_name ( keys %$exclude_attributes ) {
+  for my $column_name ( keys %$exclude_columns ) {
     throw( "no column mapping for $column_name from " . ref($adaptor) )
       unless $column_mappings->{$column_name};
-    my $match_values = $exclude_attributes->{$column_name};
+    my $match_values = $exclude_columns->{$column_name};
     my $value        = &{ $column_mappings->{$column_name} }();
-    return undef if any { $value eq $_ } @$match_values;
+    my $fail         = any { $value eq $_ } @$match_values;
+    return undef if $fail;
   }
 
   #filter attributes
@@ -274,26 +307,32 @@ sub filter_and_update_output_by_biosample {
 
   #return 1 if object matches filter conditions, undef otherwise
   #only works for object with an adaptor based on LazyAdaptor
-  my $biosample          = $p{biosample};
-  my $output_hash        = $p{output_hash};
-  my $output_attributes  = $p{output_attributes};
-  my $require_attributes = $p{require_attributes};
-  my $exclude_attributes = $p{exclude_attributes};
+  my $biosample            = $p{biosample};
+  my $biosample_attributes = $biosample->organised_attr;
+  my $output_hash          = $p{output_hash};
+  my $output_attributes    = $p{output_attributes};
+  my $require_attributes   = $p{require_attributes};
+  my $exclude_attributes   = $p{exclude_attributes};
+
+  if ( $biosample_attributes->{'Metadata validation status'} ) {
+    my ($validation_attr) =
+      @{ $biosample_attributes->{'Metadata validation status'} };
+    return undef if ( $validation_attr->value eq 'error' );
+  }
 
   #require
   for my $attribute_name ( keys %$require_attributes ) {
     my $ok               = 0;
     my $match_conditions = $require_attributes->{$attribute_name};
-    my $attributes       = $biosample->{properties}{$attribute_name};
+    my $attributes       = $biosample_attributes->{$attribute_name};
 
   ATTR: for my $attribute (@$attributes) {
       for my $match_condition (@$match_conditions) {
 
         #term source id matching
         if ( defined $match_condition->{term_source_id}
-          && defined $attribute->{term_source_id}
-          && $match_condition->{term_source_id} eq $attribute->{term_source_id}
-          )
+          && defined $attribute->id
+          && $match_condition->{term_source_id} eq $attribute->id )
         {
           $ok = 1;
           last ATTR;
@@ -301,8 +340,8 @@ sub filter_and_update_output_by_biosample {
 
         #value matching
         if ( defined $match_condition->{value}
-          && defined $attribute->{value}
-          && $match_condition->{value} eq $attribute->{value} )
+          && defined $attribute->value
+          && $match_condition->{value} eq $attribute->value )
         {
           $ok = 1;
           last ATTR;
@@ -320,16 +359,15 @@ sub filter_and_update_output_by_biosample {
   for my $attribute_name ( keys %$exclude_attributes ) {
     my $ok               = 1;
     my $match_conditions = $exclude_attributes->{$attribute_name};
-    my $attributes       = $biosample->{properties}{$attribute_name};
+    my $attributes       = $biosample_attributes->{$attribute_name};
 
   ATTR: for my $attribute (@$attributes) {
       for my $match_condition (@$match_conditions) {
 
         #term source id matching
         if ( defined $match_condition->{term_source_id}
-          && defined $attribute->{term_source_id}
-          && $match_condition->{term_source_id} eq $attribute->{term_source_id}
-          )
+          && defined $attribute->id
+          && $match_condition->{term_source_id} eq $attribute->id )
         {
           $ok = 0;
           last ATTR;
@@ -337,8 +375,8 @@ sub filter_and_update_output_by_biosample {
 
         #value matching
         if ( defined $match_condition->{value}
-          && defined $attribute->{value}
-          && $match_condition->{value} eq $attribute->{value} )
+          && defined $attribute->value
+          && $match_condition->{value} eq $attribute->value )
         {
           $ok = 0;
           last ATTR;
@@ -354,8 +392,11 @@ sub filter_and_update_output_by_biosample {
 
   #output attributes
   for my $attribute_name (@$output_attributes) {
-    my $attributes = $biosample->{properties}{$attribute_name};
-    $output_hash->{biosample_attributes}{$attribute_name} = $attributes;
+    my $attributes = $biosample_attributes->{ lc($attribute_name) };
+    if ( $attributes && @$attributes ) {
+      $output_hash->{biosample_attributes}{$attribute_name} =
+        [ map { $_->to_hash } @$attributes ];
+    }
   }
 
   return 1;
