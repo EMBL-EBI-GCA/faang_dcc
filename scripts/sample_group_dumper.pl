@@ -68,8 +68,8 @@ Use either -sample_group_id, -search_tag_field and -search_tag_value, or -json_s
 
 use strict;
 use warnings;
-use BioSD;
-use List::Util qw(any);
+use Bio::Metadata::Validate::Support::BioSDLookup;
+use List::Util qw(any none);
 use Data::Compare;
 use Cwd;
 use autodie;
@@ -78,9 +78,14 @@ use Data::Dumper;
 use Getopt::Long;
 use Carp;
 
+my $validation_status_attribute_name = 'Metadata validation status';
+
 my @valid_output_formats = qw(json tsv);
+my @valid_json_formats   = qw(hash array);
 my $output_format_string = join( '|', @valid_output_formats );
-my $output_format        = 'json';
+my $json_format_string   = join( '|', @valid_json_formats );
+
+my $output_format = 'json';
 my $output;
 my $search_tag_field;
 my $search_tag_value;
@@ -100,6 +105,9 @@ my $tsv_column_file;
 my %rst_db;
 
 my $pretty_json;
+my $json_format = 'array';
+
+my $validation_rules_file;
 
 my $help;
 
@@ -110,7 +118,7 @@ GetOptions(
   "search_tag_field=s" => \$search_tag_field,
   "search_tag_value=s" => \$search_tag_value,
   "sample_group_id=s"  => \$sample_group_id,
-  
+
   "dbhost=s" => \$rst_db{-host},
   "dbuser=s" => \$rst_db{-user},
   "dbpass=s" => \$rst_db{-pass},
@@ -131,11 +139,13 @@ GetOptions(
   "tsv_column_file=s" => \$tsv_column_file,
 
   #json specific output
-  "pretty_json" => \$pretty_json,
+  "pretty_json"   => \$pretty_json,
+  "json_format=s" => \$json_format,
 
   #processing
   "cleanup_submission_dates" => \$cleanup_submission_dates,
   "inherit_attributes"       => \$inherit_attributes,
+  "validation_rules_file=s"  => \$validation_rules_file,
 
   #misc
   "help" => \$help,
@@ -143,13 +153,12 @@ GetOptions(
 
 perldocs() if $help;
 
-my $got_rst_args = (
-  defined $rst_db{-host}  &&
-  defined $rst_db{-user}  &&
-  defined $rst_db{-pass}  &&
-  defined $rst_db{-port}  &&
-  defined $rst_db{-dbname}  
-);
+my $got_rst_args =
+  (    defined $rst_db{-host}
+    && defined $rst_db{-user}
+    && defined $rst_db{-pass}
+    && defined $rst_db{-port}
+    && defined $rst_db{-dbname} );
 
 my $source_options = 0;
 
@@ -166,13 +175,19 @@ croak "please specify -output_format $output_format_string"
   unless ( $output_format && any { $_ eq $output_format }
   @valid_output_formats );
 croak "please specify -output <file>" if ( $output_format && !$output );
+croak "please specify -json_format $json_format_string"
+  unless ( $json_format && any { $json_format eq $_ } @valid_json_formats );
+
+my $validator;
+$validator = create_validator($validation_rules_file)
+  if ($validation_rules_file);
 
 my $rst;
-if ($got_rst_args){
+if ($got_rst_args) {
   require ReseqTrack::DBSQL::DBAdaptor;
 
   $rst = ReseqTrack::DBSQL::DBAdaptor->new(%rst_db);
-  
+
   croak "could not connect to reseqtrack db" unless ($rst);
 }
 
@@ -196,16 +211,18 @@ else {
       fetch_sample_ids_matching_tag_and_value( $search_tag_field,
       $search_tag_value );
   }
-  elsif ($rst){
+  elsif ($rst) {
     $project_sample_ids = fetch_biosample_ids_from_rst($rst);
   }
 
-  $samples = biosample_id_to_sample_hash($project_sample_ids);
+  $samples = biosample_id_to_entity($project_sample_ids);
 }
 
 #section 2, in which we may fiddle around with the data
 
 cleanup_submission_dates($samples) if ($cleanup_submission_dates);
+
+validate_samples( $samples, $validator ) if ($validator);
 
 inherit_values($samples) if ($inherit_attributes);
 
@@ -225,17 +242,18 @@ if ( $output_format eq 'tsv' ) {
   tsv_output(
     $samples, $fh,
     {
-      col_sep          => $col_sep,
-      line_sep         => $line_sep,
-      value_sep        => $value_sep,
-      empty_value      => $empty_value,
-      omit_units       => \@omit_units,
-      property_columns => \@tsv_columns,
+      col_sep                => $col_sep,
+      line_sep               => $line_sep,
+      value_sep              => $value_sep,
+      empty_value            => $empty_value,
+      omit_units             => \@omit_units,
+      property_columns       => \@tsv_columns,
+      show_validation_status => ( defined $validator ),
     }
   );
 }
 if ( $output_format eq 'json' ) {
-  json_output( $samples, $fh, $pretty_json );
+  json_output( $samples, $fh, $pretty_json, $json_format );
 }
 
 close($fh) if ($close_fh);
@@ -260,25 +278,40 @@ sub load_from_json {
 
   close $fh if $close_fh;
 
-  my $samples = JSON->new->decode($x);
+  my $sample_hashes = JSON->new->decode($x);
 
-  return $samples;
+  if ( ref $sample_hashes eq 'HASH' ) {
+    my @h = values %$sample_hashes;
+    $sample_hashes = \@h;
+  }
+
+  my @samples = map { Bio::Metadata::Entity->new($_) } @$sample_hashes;
+
+  return \@samples;
 }
 
 sub inherit_values {
   my ($samples) = @_;
 
-  my %samples_by_id = map { $_->{id} => $_ } @$samples;
+  my %samples_by_id = map { $_->id() => $_ } @$samples;
 
   for my $s (@$samples) {
-    next unless ( @{ $s->{derived_from} } );
+
+    #    next unless ( @{ $s->{derived_from} } );
 
     my @derived_sample_chain =
-      derived_sample_chain( $s, { $s->{id} => 1 }, \%samples_by_id );
+      derived_sample_chain( $s, { $s->id() => 1 }, \%samples_by_id );
 
     merge_values_from_chain( $s, @derived_sample_chain );
   }
 
+}
+
+sub get_derived_from_ids {
+  my ($sample) = @_;
+
+  return map { $_->value }
+    grep { lc( $_->name ) eq 'derived from' } $sample->all_attributes;
 }
 
 sub derived_sample_chain {
@@ -286,7 +319,7 @@ sub derived_sample_chain {
 
   my @sample_chain;
 
-  for my $df_id ( @{ $sample->{derived_from} } ) {
+  for my $df_id ( get_derived_from_ids($sample) ) {
 
     #avoid circular relationships
     next if exists $sample_ids_seen->{$df_id};
@@ -295,16 +328,15 @@ sub derived_sample_chain {
     my $sample_derived_from = $samples_by_id->{$df_id};
 
     if ( !$sample_derived_from ) {
-      $sample_derived_from = biosample_id_to_sample_hash($df_id);
+      $sample_derived_from = biosample_id_to_entity($df_id);
     }
 
     push @sample_chain, $sample_derived_from;
 
-    if ( @{ $sample_derived_from->{derived_from} } ) {
-      push @sample_chain,
-        derived_sample_chain( $sample_derived_from, $sample_ids_seen,
-        $samples_by_id );
-    }
+    push @sample_chain,
+      derived_sample_chain( $sample_derived_from, $sample_ids_seen,
+      $samples_by_id );
+
   }
 
   return @sample_chain;
@@ -313,15 +345,52 @@ sub derived_sample_chain {
 sub merge_values_from_chain {
   my ( $sample, @sample_chain ) = @_;
 
-  my $target_properties = $sample->{properties};
+  my $target_properties = $sample->organised_attr;
+  my $validation_status;
+
+  if ( $target_properties->{$validation_status_attribute_name} ) {
+    ($validation_status) =
+      @{ $target_properties->{$validation_status_attribute_name} };
+  }
 
   for my $source_sample (@sample_chain) {
-    my $source_properties = $source_sample->{properties};
+    my $source_properties = $source_sample->organised_attr;
 
-    for my $k ( keys %$source_properties ) {
-      if ( !exists $target_properties->{$k} ) {
-        $target_properties->{$k} = $source_properties->{$k};
+    for my $k (
+      grep { !exists $target_properties->{$_} }
+      keys %$source_properties
+      )
+    {
+      $target_properties->{$k} = $source_properties->{$k};
+      $sample->add_attribute( @{ $source_properties->{$k} } );
+      ($validation_status) = @{ $source_properties->{$k} }
+        if ( $k eq $validation_status_attribute_name );
+    }
+
+    if ( $validation_status
+      && $source_properties->{$validation_status_attribute_name} )
+    {
+      my ($chained_status) =
+        @{ $source_properties->{$validation_status_attribute_name} };
+
+      my $take_status = 0;
+
+      #preserve the worst value in the chain
+      if ( $chained_status->value eq 'error'
+        && $validation_status->value ne 'error' )
+      {
+        $take_status = 1;
       }
+      if ( $chained_status->value eq 'warning'
+        && $validation_status->value eq 'pass' )
+      {
+        $take_status = 1;
+      }
+
+      if ($take_status) {
+        $validation_status->value( $chained_status->value );
+      }
+
     }
   }
 }
@@ -330,13 +399,25 @@ sub cleanup_submission_dates {
   my ($samples) = @_;
 
   for my $s (@$samples) {
-    $s->{release_date} =~ s/T.*//;
-    $s->{update_date}  =~ s/T.*//;
+    my $oa = $s->organised_attr();
+
+    for my $k ( 'biosamples release date', 'biosamples update date' ) {
+      my $attrs = $oa->{$k};
+
+      if ($attrs) {
+        for my $a (@$attrs) {
+          my $v = $a->value;
+          $v =~ s/T.*//;
+          $a->value($v);
+        }
+
+      }
+    }
   }
 }
 
 sub json_output {
-  my ( $samples, $fh, $pretty_json ) = @_;
+  my ( $samples, $fh, $pretty_json, $json_format ) = @_;
 
   my $json = JSON->new;
 
@@ -344,20 +425,33 @@ sub json_output {
     $json = $json->pretty;
   }
 
-  print $fh $json->encode($samples);
+  my $data;
+
+  if ( $json_format eq 'array' ) {
+    $data = [ map { $_->to_hash } @$samples ];
+  }
+  elsif ( $json_format eq 'hash' ) {
+    my %d = map { $_->id => $_->to_hash } @$samples;
+    $data = \%d;
+  }
+  else {
+    croak "Not a recognised json_format: $json_format";
+  }
+  print $fh $json->encode($data);
 }
 
 sub tsv_output {
-  my ( $samples, $fh, $f ) = @_;
+  my ( $samples, $fh, $f, ) = @_;
 
-  my $col_sep          = $f->{col_sep};
-  my $lin_sep          = $f->{line_sep};
-  my $value_sep        = $f->{value_sep};
-  my $empty_value      = $f->{empty_value};
-  my $omit_units       = $f->{omit_units};
-  my $property_columns = $f->{property_columns};
+  my $col_sep                = $f->{col_sep};
+  my $lin_sep                = $f->{line_sep};
+  my $value_sep              = $f->{value_sep};
+  my $empty_value            = $f->{empty_value};
+  my $omit_units             = $f->{omit_units};
+  my $property_columns       = $f->{property_columns};
+  my $show_validation_status = $f->{show_validation_status};
 
-  my @fixed_s_headers = ( 'BioSamples ID', 'release date', 'update date' );
+  my @fixed_s_headers = ( 'BioSamples ID', );
   my @fixed_d_headers = ('Derived from');
 
   my @p_headers;
@@ -366,8 +460,18 @@ sub tsv_output {
     @p_headers = @$property_columns;
   }
   else {
-    my @fixed_p_headers =
-      ( 'Sample Name', 'Sample Description', 'Material', 'Organism', 'Sex', );
+    my @fixed_p_headers = (
+      'BioSamples release date',
+      'BioSamples update date',
+      'Sample Name',
+      'Sample Description',
+      'Material',
+      'Organism',
+      'Sex',
+    );
+    unshift @fixed_p_headers, $validation_status_attribute_name
+      if ($show_validation_status);
+
     my @dynamic_p_headers =
       dynamic_property_headers( $samples, \@fixed_p_headers );
 
@@ -385,19 +489,21 @@ sub tsv_output {
     . $line_sep;
 
   for my $s (@$samples) {
-    my @vals = ( $s->{id}, $s->{release_date}, $s->{update_date}, );
+    my $organised_attrs = $s->organised_attr();
+
+    my @vals = ( $s->id );
 
     for my $property_name (@p_headers) {
-      my $vals = $s->{properties}{$property_name};
+      my $vals = $organised_attrs->{ lc($property_name) };
 
       if ($vals) {
         my $v = join(
           $value_sep,
           map {
-            $_->{value}
+            $_->value
               . (
-                ( $_->{unit} && !$units_to_omit{ $_->{unit} } )
-              ? ( ' ' . $_->{unit} )
+                ( $_->units && !$units_to_omit{ $_->units } )
+              ? ( ' ' . $_->units )
               : ''
               )
           } @$vals
@@ -409,7 +515,8 @@ sub tsv_output {
       }
     }
 
-    my $dv = join( $value_sep, @{ $s->{derived_from} } );
+    my $dv = join( $value_sep,
+      map { $_->value } @{ $organised_attrs->{'derived from'} } );
     push @vals, $dv // $empty_value;
 
     print $fh join( $col_sep, @vals ) . $line_sep;
@@ -421,10 +528,17 @@ sub dynamic_property_headers {
   my ( $samples, $fixed_p_headers ) = @_;
 
   my %property_names;
+  my $empty_entity = Bio::Metadata::Entity->new();
+
   for my $s (@$samples) {
-    map { $property_names{$_} = 1 } keys %{ $s->{properties} };
+    map { $property_names{$_} = 1 }
+      map { $empty_entity->normalise_attribute_name( $_->name ) }
+      $s->all_attributes;
   }
-  my %p_header_filter = map { $_ => 1 } (@$fixed_p_headers);
+
+  my %p_header_filter =
+    map { $empty_entity->normalise_attribute_name($_) => 1 }
+    (@$fixed_p_headers);
 
   my @dynamic_p_headers =
     sort { $a cmp $b } grep { !$p_header_filter{$_} } keys %property_names;
@@ -432,60 +546,23 @@ sub dynamic_property_headers {
   return @dynamic_p_headers;
 }
 
-sub biosample_id_to_sample_hash {
+sub biosample_id_to_entity {
   my ( $sample_ids, $inherit_attributes ) = @_;
   my @samples;
 
+  my $biosd = Bio::Metadata::Validate::Support::BioSDLookup->new();
+
   for my $sample_id (@$sample_ids) {
 
-    my $sample = {
-      id           => $sample_id,
-      release_date => undef,
-      update_date  => undef,
-      annotations  => [],
-      properties   => {},
-      derived_from => []
-    };
-    push @samples, $sample;
-
-    my $biosd_sample = BioSD::fetch_sample($sample_id);
-    confess "could not find biosample for $sample_id" unless $biosd_sample;
-
-    $sample->{release_date} = $biosd_sample->submission_release_date;
-    $sample->{update_date}  = $biosd_sample->submission_update_date;
-
-    #annotation
-    my $biosd_annotation = $biosd_sample->annotations;
-    for my $a (@$biosd_annotation) {
-      push @{ $sample->{annotations} }, { type => $a->type };
+    my $entity = $biosd->fetch_sample($sample_id);
+    if (!$entity){
+      carp "No biosample entry for $sample_id";#TODO - should this croak?
+      next;
     }
+    $entity->add_attribute( { name => 'Sample Name', value => $entity->id } );
+    $entity->id($sample_id);
 
-    #properties
-    my $biosd_properties = $biosd_sample->properties;
-    for my $p (@$biosd_properties) {
-      my $prop_name = $p->class;
-      my @qvalues;
-      $sample->{properties}->{$prop_name} = \@qvalues;
-
-      for my $qv ( @{ $p->qualified_values } ) {
-        my $ts = $qv->term_source;
-        my $q  = {
-          value          => $qv->value,
-          unit           => $qv->unit || undef,
-          term_source    => ($ts) ? $ts->name : undef,
-          term_source_id => ($ts) ? $ts->term_source_id : undef,
-        };
-
-        push @qvalues, $q;
-      }
-    }
-
-    #derived from
-    my $biosd_derived_from = $biosd_sample->derived_from;
-    for my $df_sample (@$biosd_derived_from) {
-      push @{ $sample->{derived_from} }, $df_sample->id;
-    }
-
+    push @samples, $entity;
   }
 
   @samples = sort { $a->{id} cmp $b->{id} } @samples;
@@ -517,10 +594,10 @@ sub fetch_sample_ids_in_group {
 }
 
 sub fetch_biosample_ids_from_rst {
-  my ($rst) = @_;
-  my $sa = $rst->get_SampleAdaptor;
+  my ($rst)   = @_;
+  my $sa      = $rst->get_SampleAdaptor;
   my $samples = $sa->fetch_all();
-  my @biosample_ids = grep {defined $_} map {$_->biosample_id} @$samples;
+  my @biosample_ids = grep { defined $_ } map { $_->biosample_id } @$samples;
   return \@biosample_ids;
 }
 
@@ -542,4 +619,37 @@ sub load_tsv_columns {
 sub perldocs {
   exec( 'perldoc', $0 );
   exit(0);
+}
+
+sub create_validator {
+  my ( $rule_file, $verbose ) = @_;
+
+  require Bio::Metadata::Loader::JSONRuleSetLoader;
+  require Bio::Metadata::Validate::EntityValidator;
+
+  my $loader = Bio::Metadata::Loader::JSONRuleSetLoader->new();
+  print "Attempting to load $rule_file$/" if $verbose;
+  my $rule_set = $loader->load($rule_file);
+  print 'Loaded ' . $rule_set->name . $/ if $verbose;
+
+  my $validator =
+    Bio::Metadata::Validate::EntityValidator->new( rule_set => $rule_set );
+
+  return $validator;
+}
+
+sub validate_samples {
+  my ( $samples, $validator ) = @_;
+
+  my (
+    $entity_status,      $entity_outcomes, $attribute_status,
+    $attribute_outcomes, $entity_rule_groups,
+  ) = $validator->check_all($samples);
+
+  for my $s (@$samples) {
+    my $v = $entity_status->{$s};
+    $s->add_attribute(
+      { name => $validation_status_attribute_name, value => $v } );
+  }
+
 }
