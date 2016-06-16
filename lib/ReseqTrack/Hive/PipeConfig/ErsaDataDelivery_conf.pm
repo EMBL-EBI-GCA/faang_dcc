@@ -67,6 +67,7 @@ sub default_options {
       'ersa_dump',  # name used by the beekeeper to prefix job names on the farm
     biosample_data_file => '/homes/davidr/perl_code/faang_test/samples.json',
     manifest_output_dir => '/hps/cstor01/nobackup/faang/davidr/ersa_delivery',
+    run_input_lookup_files => ['/homes/davidr/perl_code/faang_test/input_lookup_manual.json', '/homes/davidr/perl_code/faang_test/input_lookup_auto.json'],
 
     #output
     collection_columns    => [ 'name', 'type' ],
@@ -78,14 +79,17 @@ sub default_options {
     sample_columns        => ['biosample_id'],
 
     run_attribute_keys => [],
-    run_columns        => [ 'run_source_id', 'center_name', 'run_center_name' ],
+    run_columns =>
+      [ 'run_id', 'run_source_id', 'center_name', 'run_center_name' ],
 
     study_attribute_keys => [],
     study_columns        => ['study_source_id'],
 
     experiment_attribute_keys => [ 'experiment target', 'assay type' ],
-    experiment_columns =>
-      [ 'experiment_source_id', 'library_strategy', 'library_layout' ],
+    experiment_columns        => [
+      'experiment_id',    'experiment_source_id',
+      'library_strategy', 'library_layout'
+    ],
 
     biosample_attributes => [
       'Sample Name', 'Organism', 'Sex', 'material', 'breed', 'organism part',
@@ -131,20 +135,24 @@ sub default_options {
     exclude_sample_columns    => {},
 
     require_biosample_attributes => {
-      Organism =>
-        [ #TODO consider expanding this to include sub-species, e.g. sus scrofa domesticus
-        { term_source_id => 9913 },    #bos taurus
-        { term_source_id => 9031 },    #gallus gallus
-        { term_source_id => 9796 },    #equus caballus
-        { term_source_id => 9823 },    #sus scrofa
-        { term_source_id => 9940 },    #ovis aries
-        ]
+
+#TODO uncomment the following block in production, else you'll try to give ERSA goat data
+#      Organism =>
+#        [ #TODO consider expanding this to include sub-species, e.g. sus scrofa domesticus
+#        { term_source_id => 9913 },    #bos taurus
+#        { term_source_id => 9031 },    #gallus gallus
+#        { term_source_id => 9796 },    #equus caballus
+#        { term_source_id => 9823 },    #sus scrofa
+#        { term_source_id => 9940 },    #ovis aries
+#        ]
+
     },
     exclude_biosample_attributes => {},
 
     seeding_module  => 'ReseqTrack::Hive::PipeSeed::FaangErsaDump',
     seeding_options => {
       biosample_data_file => $self->o('biosample_data_file'),
+      run_input_lookup_files => $self->o('run_input_lookup_files'),
 
       #output of collection
       output_columns    => $self->o('collection_columns'),
@@ -240,7 +248,7 @@ sub pipeline_analyses {
       },
       -analysis_capacity => 1,    # use per-analysis limiter
       -flow_into         => {
-        '2->A' => ['test_fan'],
+        '2->A' => ['accu_target'],
         'A->1' => ['write_registration_manifest']
       },
     }
@@ -249,11 +257,19 @@ sub pipeline_analyses {
   push(
     @analyses,
     {
-      -logic_name  => 'test_fan',
+      -logic_name  => 'accu_target',
       -module      => 'Bio::EnsEMBL::Hive::RunnableDB::Dummy',
       -meadow_type => 'LOCAL',
-      -flow_into => { 1 => [ 'mark_seed_complete', ':////accu?ersa_dump=[]' ] }
+      -flow_into   => { 1 => ['?accu_name=ersa_dump&accu_address={ps_id}'] }
+    }
+  );
 
+  push(
+    @analyses,
+    {
+      -logic_name  => 'load_registration_file',
+      -module      => 'Bio::EnsEMBL::Hive::RunnableDB::Dummy',
+      -meadow_type => 'LOCAL',
     }
   );
 
@@ -289,6 +305,11 @@ sub pipeline_analyses {
         },
         output_project_prefix            => 'FAANG-',
         output_project_suffix_param_name => 'study_source_id'
+      },
+      -flow_into => {
+        1 => ['load_registration_file'],
+        2 => ['mark_seed_complete'],
+        
       }
     }
   );
