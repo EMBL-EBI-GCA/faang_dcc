@@ -480,6 +480,7 @@ sub tsv_output {
 
   my %property_names;
   for my $s (@$samples) {
+    
     map { $property_names{$_} = 1 } keys %{ $s->{properties} };
   }
 
