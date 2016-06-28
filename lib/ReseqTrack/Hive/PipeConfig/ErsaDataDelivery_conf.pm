@@ -66,8 +66,13 @@ sub default_options {
     pipeline_name =>
       'ersa_dump',  # name used by the beekeeper to prefix job names on the farm
     biosample_data_file => '/homes/davidr/perl_code/faang_test/samples.json',
+    experiment_data_file =>
+      '/homes/davidr/perl_code/faang_test/faang_experiments.json',
     manifest_output_dir => '/hps/cstor01/nobackup/faang/davidr/ersa_delivery',
-    run_input_lookup_files => ['/homes/davidr/perl_code/faang_test/input_lookup_manual.json', '/homes/davidr/perl_code/faang_test/input_lookup_auto.json'],
+    run_input_lookup_files => [
+      '/homes/davidr/perl_code/faang_test/input_lookup_manual.json',
+      '/homes/davidr/perl_code/faang_test/input_lookup_auto.json'
+    ],
 
     #output
     collection_columns    => [ 'name', 'type' ],
@@ -151,8 +156,10 @@ sub default_options {
 
     seeding_module  => 'ReseqTrack::Hive::PipeSeed::FaangErsaDump',
     seeding_options => {
-      biosample_data_file => $self->o('biosample_data_file'),
+
+      biosample_data_file    => $self->o('biosample_data_file'),
       run_input_lookup_files => $self->o('run_input_lookup_files'),
+      experiment_data_file   => $self->o('experiment_data_file'),
 
       #output of collection
       output_columns    => $self->o('collection_columns'),
@@ -209,24 +216,6 @@ sub default_options {
   };
 }
 
-sub resource_classes {
-  my ($self) = @_;
-  return {
-    %{ $self->SUPER::resource_classes }
-    ,    # inherit 'default' from the parent class
-    '200Mb' => {
-          'LSF' => '-C0 -M200 -q '
-        . $self->o('lsf_queue')
-        . ' -R"select[mem>200] rusage[mem=200]"'
-    },
-    '400Mb' => {
-          'LSF' => '-C0 -M400 -q '
-        . $self->o('lsf_queue')
-        . ' -R"select[mem>400] rusage[mem=400]"'
-    },
-  };
-}
-
 sub pipeline_wide_parameters {
   my ($self) = @_;
   return { %{ $self->SUPER::pipeline_wide_parameters }, };
@@ -236,6 +225,7 @@ sub pipeline_analyses {
   my ($self) = @_;
 
   my @analyses;
+
   push(
     @analyses,
     {
@@ -267,8 +257,13 @@ sub pipeline_analyses {
   push(
     @analyses,
     {
-      -logic_name  => 'load_registration_file',
-      -module      => 'Bio::EnsEMBL::Hive::RunnableDB::Dummy',
+      -logic_name => 'load_registration_file',
+      -module     => 'ReseqTrack::Hive::Process::LoadFile',
+      -parameters => {
+        type               => 'ERSA_REGISTRATION',
+        file               => '#registration_file#',
+        do_pipeline_output => 0,
+      },
       -meadow_type => 'LOCAL',
     }
   );
@@ -309,7 +304,7 @@ sub pipeline_analyses {
       -flow_into => {
         1 => ['load_registration_file'],
         2 => ['mark_seed_complete'],
-        
+
       }
     }
   );

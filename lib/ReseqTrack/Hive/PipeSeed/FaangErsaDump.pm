@@ -26,6 +26,10 @@ sub create_seed_params {
     || 'ersa_dump';
 
   my $input_run_id_lookups = $self->load_run_input_lookup();
+  my $biosample_entities_by_id =
+    $self->load_entities_from_file( $options->{biosample_data_file} );
+  my $experiment_entities_by_id =
+    $self->load_entities_from_file( $options->{experiment_data_file} );
 
   my %run_conditions = (
     adaptor            => $ra,
@@ -66,8 +70,7 @@ sub create_seed_params {
     exclude_columns    => $options->{'exclude_study_columns'} || {},
   );
 
-  my $biosample_entries_by_id = $self->load_biosamples_entries();
-  my %biosample_conditions    = (
+  my %biosample_conditions = (
     output_attributes  => $self->option_array('output_biosample_attributes'),
     require_attributes => $options->{'require_biosample_attributes'} || {},
     exclude_attributes => $options->{'exclude_biosample_attributes'} || {},
@@ -96,13 +99,11 @@ SEED:
     my $study      = $experiment->study();
 
     my $biosample_id = $sample->biosample_id;
+    my $biosample    = $biosample_entities_by_id->{ $sample->biosample_id };
 
-    #runs can have input
-    my $input_run_id =
-      first { $_ } map { $_->{$run_source_id} } @$input_run_id_lookups;
-    $output_hash->{input_run_id} = $input_run_id;
+    my $experiment_entity =
+      $experiment_entities_by_id->{ $experiment->experiment_source_id };
 
-    my $biosample = $biosample_entries_by_id->{ $sample->biosample_id };
     next SEED unless $biosample;    #TODO temp fix while testing
     throw( "Cannot find biosample entry $biosample_id for sample "
         . $sample->sample_source_id )
@@ -110,12 +111,23 @@ SEED:
 
     my $match = 1;
 
+    $match = $self->filter_by_entity_validated_metadata($experiment_entity);
+    next SEED unless $match;
+
+    $match = $self->filter_by_entity_validated_metadata($biosample)
+      if $biosample;
+#    next SEED unless $match;
+
+    $match =
+      $self->filter_and_update_for_chip_control( $run, $experiment,
+      $input_run_id_lookups, $output_hash );
+#    next SEED unless $match;
+
     $match = $self->filter_and_update_output_by_biosample(
       output_hash => $output_hash,
       biosample   => $biosample,
       %biosample_conditions
     );
-
     next SEED unless $match;
 
     $match = $self->filter_and_update_output(
@@ -139,8 +151,8 @@ SEED:
       object      => $sample,
       %sample_conditions
     );
-
     next SEED unless $match;
+
     $match = $self->filter_and_update_output(
       output_hash => $output_hash,
       object      => $study,
@@ -201,21 +213,19 @@ sub load_run_input_lookup {
   return \@lookup_hashes;
 }
 
-sub load_biosamples_entries {
-  my ($self) = @_;
+sub load_entities_from_file {
+  my ( $self, $src_file ) = @_;
 
-  my $src_file = $self->options()->{biosample_data_file};
-
-  my $sample_array = $self->load_json($src_file);
+  my $data = $self->load_json($src_file);
 
   throw("json sample file $src_file should decode to an array")
-    if ( !$sample_array || !ref $sample_array || ref $sample_array ne 'ARRAY' );
+    if ( !$data || !ref $data || ref $data ne 'ARRAY' );
 
-  my %samples_by_id =
+  my %entities_by_id =
     map { $_->id() => $_ }
-    map { Bio::Metadata::Entity->new($_) } @$sample_array;
+    map { Bio::Metadata::Entity->new($_) } @$data;
 
-  return \%samples_by_id;
+  return \%entities_by_id;
 }
 
 sub filter_and_update_output {
@@ -299,6 +309,55 @@ sub filter_and_update_output {
     }
   }
 
+  return 1;
+}
+
+=h1 filter_and_update_for_chip_control
+  ChIP-seq should have a control, tagged as 'input DNA' (see experiment metadata spec)
+  ERSA need each non-input run to have a control run
+  We take a list of lookups, and use the first run_id available (order matters).
+  The intention is that we have two lookups -
+    1 generated automatically (low priotiry)
+    1 maintained by hand to handle exceptions, special cases etc (high priority)  
+=cut
+
+sub filter_and_update_for_chip_control {
+  my ( $self, $run, $experiment, $input_run_id_lookups, $output_hash ) = @_;
+
+  if ( $experiment->library_strategy ne 'ChIP-seq' ) {
+    return 1;
+  }
+  my $experiment_target = first { $_ }
+  map { $_->attribute_value }
+    grep { uc( $_->attribute_name ) eq 'EXPERIMENT TARGET' }
+    @{ $experiment->attributes };
+
+  if ( $experiment_target && uc($experiment_target) eq 'INPUT DNA' ) {
+    return 1;
+  }
+
+  my $input_run_id =
+    first { $_ } map { $_->{ $run->run_source_id } } @$input_run_id_lookups;
+
+  if ( !$input_run_id ) {
+    return undef;
+  }
+  $output_hash->{input_run_id} = $input_run_id;
+  return 1;
+}
+
+sub filter_by_entity_validated_metadata {
+  my ( $self, $entity ) = @_;
+
+  my ($validation_attr) =
+    grep { $_->name eq 'Metadata validation status' } $entity->all_attributes;
+
+  if ( !$validation_attr ) {
+    return undef;
+  }
+  if ( $validation_attr->value eq 'error' ) {
+    return undef;
+  }
   return 1;
 }
 
