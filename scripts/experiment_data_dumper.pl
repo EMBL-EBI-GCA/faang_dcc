@@ -198,7 +198,7 @@ else {
 
   for my $exp ( @{ $ea->fetch_all() } ) {
     my @attributes =
-      map { { name => $_->attribute_name, value => $_->attribute_value, unit => $_->attribute_units } }
+      map { { name => $_->attribute_name, value => $_->attribute_value, units => $_->attribute_units } }
       @{ $exp->attributes };
 
     my $ent = Bio::Metadata::Entity->new(
