@@ -104,7 +104,7 @@ This supporting information can be produced by scripts in this repository, see t
 BioSample information is serialised as JSON for use in the delivery to Ensembl Regulation pipeline, and in tabular form for general consumption. This is implemented in these scripts:
 
  *  `scripts/sample_group_dumps.sh`. 
- * `scripts/experiment_group_dumps.sh`
+ * `scripts/experiment_data_dumps.sh`
  
 ### ChIP Input control mappings
 
