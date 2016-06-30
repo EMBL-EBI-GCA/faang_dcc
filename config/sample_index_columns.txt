@@ -3,7 +3,6 @@ Sample Description
 Material
 Organism
 Sex
-Child Of
 animal age at collection
 availability
 birth date
@@ -14,9 +13,13 @@ birth weight
 breed
 cell culture protocol
 cell type
+child of
 culture conditions
 culture type
+delivery ease
+derived from
 developmental stage
+environmental conditions
 fasted status
 gestational age at sample collection
 health status
@@ -28,15 +31,16 @@ number of pieces
 organism part
 parturition trait
 pedigree
-phenotype
+physiological conditions
 placental weight
 pregnancy length
+project
 purification protocol
-same as
 specimen collection date
 specimen collection protocol
 specimen picture url
 specimen size
 specimen volume
 specimen weight
-
+strain
+Derived from

@@ -1,0 +1,4 @@
+[DeliverErsaFastq]
+table_name=collection
+config_module=ReseqTrack::Hive::PipeConfig::ErsaDataDelivery_conf
+config_options=-manifest_output_dir /hps/cstor01/nobackup/faang/ersa-registration-manifests

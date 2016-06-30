@@ -65,13 +65,13 @@ sub default_options {
 
     pipeline_name =>
       'ersa_dump',  # name used by the beekeeper to prefix job names on the farm
-    biosample_data_file => '/homes/davidr/perl_code/faang_test/samples.json',
+    biosample_data_file => '/hps/cstor01/nobackup/faang/farmpipe/supporting-info/rst_samples.json',
     experiment_data_file =>
-      '/homes/davidr/perl_code/faang_test/faang_experiments.json',
-    manifest_output_dir => '/hps/cstor01/nobackup/faang/davidr/ersa_delivery',
+      '/hps/cstor01/nobackup/faang/farmpipe/supporting-info/rst_experiments.json',
+    manifest_output_dir => '/hps/cstor01/nobackup/faang/ersa-registration-manifests',
     run_input_lookup_files => [
-      '/homes/davidr/perl_code/faang_test/input_lookup_manual.json',
-      '/homes/davidr/perl_code/faang_test/input_lookup_auto.json'
+      '/hps/cstor01/nobackup/faang/farmpipe/supporting-info/input_lookup_manual.json',
+      '/hps/cstor01/nobackup/faang/farmpipe/supporting-info/input_lookup_auto.json'
     ],
 
     #output
