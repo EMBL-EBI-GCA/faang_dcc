@@ -75,6 +75,7 @@ use Cwd;
 use autodie;
 use JSON;
 use Data::Dumper;
+use List::Uniq qw(uniq);
 use Getopt::Long;
 use Carp;
 
@@ -551,19 +552,32 @@ sub biosample_id_to_entity {
   my ( $sample_ids, $inherit_attributes ) = @_;
   my @samples;
 
-  my $biosd = Bio::Metadata::Validate::Support::BioSDLookup->new();
+  my $biosd_lookup = Bio::Metadata::Validate::Support::BioSDLookup->new();
+  my $biosd_session = $biosd_lookup->biosd_session(); 
+
 
   for my $sample_id (@$sample_ids) {
 
-    my $entity = $biosd->fetch_sample($sample_id);
+    my $entity = $biosd_lookup->fetch_sample($sample_id);
+    
     if (!$entity){
       carp "No biosample entry for $sample_id";#TODO - should this croak?
       next;
     }
+    push @samples, $entity;
+    
     $entity->add_attribute( { name => 'Sample Name', value => $entity->id } );
     $entity->id($sample_id);
+    
+    my $sample = $biosd_session->fetch_sample($sample_id);
+    my $groups = $sample->groups;
+    my @organisations = grep {$_ ne 'EMBL-EBI' } map {$_->name} (map {@{$_->organizations}} @$groups);
+    @organisations = sort {$a cmp $b} uniq(@organisations);
+    for my $organisation (@organisations){
+      $entity->add_attribute({name => 'Centre', value => $organisation, allow_further_validation => 0});
+    }
 
-    push @samples, $entity;
+    
   }
 
   @samples = sort { $a->{id} cmp $b->{id} } @samples;
