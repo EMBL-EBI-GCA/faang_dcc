@@ -216,7 +216,7 @@ else {
     $project_sample_ids = fetch_biosample_ids_from_rst($rst);
   }
 
-  $samples = biosample_id_to_entity($project_sample_ids);
+  $samples = biosample_ids_to_entities($project_sample_ids);
 }
 
 #section 2, in which we may fiddle around with the data
@@ -329,7 +329,8 @@ sub derived_sample_chain {
     my $sample_derived_from = $samples_by_id->{$df_id};
 
     if ( !$sample_derived_from ) {
-      $sample_derived_from = biosample_id_to_entity($df_id);
+	  my $dss = biosample_ids_to_entities([$df_id]);
+      ($sample_derived_from) = @$dss;
     }
 
     push @sample_chain, $sample_derived_from;
@@ -548,7 +549,7 @@ sub dynamic_property_headers {
   return @dynamic_p_headers;
 }
 
-sub biosample_id_to_entity {
+sub biosample_ids_to_entities {
   my ( $sample_ids, $inherit_attributes ) = @_;
   my @samples;
 
