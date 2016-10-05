@@ -351,10 +351,10 @@ Organization Address	The European Bioinformatics Institute (EMBL-EBI), Wellcome 
 Organization URI	http://www.ebi.ac.uk	http://faang.org/
 Organization Email
 Organization Role	EFO_0001731
-Person Last Name	Richardson
-Person Initials	M
-Person First Name	David
-Person Email	davidr\@ebi.ac.uk
+Person Last Name	Harrison
+Person Initials	W
+Person First Name	Peter
+Person Email	peter\@ebi.ac.uk
 Person Role	EFO_0001741
 Publication PubMed ID 25854118
 
