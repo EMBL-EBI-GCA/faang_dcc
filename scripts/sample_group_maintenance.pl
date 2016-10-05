@@ -344,7 +344,7 @@ Submission Identifier	GSB-430
 Submission Description	FAANG aims to produce comprehensive maps of functional elements in the genomes of domesticated animal species.
 Submission Version	1.2
 Submission Reference Layer	false
-Submission Release Date	2016/02/10
+Submission Release Date	2017/01/01
 Submission Update Date	$date
 Organization Name	EMBL-EBI	FAANG
 Organization Address	The European Bioinformatics Institute (EMBL-EBI), Wellcome Genome Campus, Hinxton, Cambridge, CB10 1SD, United Kingdom
