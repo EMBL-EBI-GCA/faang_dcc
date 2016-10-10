@@ -104,8 +104,8 @@ if ( $mode eq 'update' || $mode eq 'dryrun' ) {
 }
 
 #1. fetch sample IDs for group SAMEG307473
-my $sample_ids_in_group = fetch_current_sample_ids_in_group($group_id);
-
+my $sample_ids_in_group = [];#FIXME  When BioSamples is able to display FAANG samples delete this line 
+#my $sample_ids_in_group = fetch_current_sample_ids_in_group($group_id); #FIXME  When BioSamples is able to display FAANG samples uncomment this line 
 #2. fetch all samples matching 'project: FAANG' (search by FAANG, check for having property 'project' with value ‘FAANG’ and were submitted directly to BioSamples)
 my $project_sample_ids =
   fetch_sample_ids_matching_tag_and_value( $search_tag_field,
@@ -336,31 +336,31 @@ sub write_sampletab {
   if ( !$allow_removal ) {
     push @sample_ids, @{ $commonality->{ids_to_remove} };
   }
-
+#FIXME  When BioSamples is able to display FAANG samples set release date to current date to make samples visible 
   print $fh <<"END";
 [MSI]
-Submission Title	FAANG - Functional Annotation of Animal Genomes
-Submission Identifier	GSB-430
-Submission Description	FAANG aims to produce comprehensive maps of functional elements in the genomes of domesticated animal species.
-Submission Version	1.2
-Submission Reference Layer	false
-Submission Release Date	2017/01/01
-Submission Update Date	$date
-Organization Name	EMBL-EBI	FAANG
-Organization Address	The European Bioinformatics Institute (EMBL-EBI), Wellcome Genome Campus, Hinxton, Cambridge, CB10 1SD, United Kingdom
-Organization URI	http://www.ebi.ac.uk	http://faang.org/
+Submission Title  FAANG - Functional Annotation of Animal Genomes
+Submission Identifier GSB-430
+Submission Description  FAANG aims to produce comprehensive maps of functional elements in the genomes of domesticated animal species.
+Submission Version  1.2
+Submission Reference Layer  false
+Submission Release Date 2017/01/01
+Submission Update Date  $date
+Organization Name EMBL-EBI  FAANG
+Organization Address  The European Bioinformatics Institute (EMBL-EBI), Wellcome Genome Campus, Hinxton, Cambridge, CB10 1SD, United Kingdom
+Organization URI  http://www.ebi.ac.uk  http://faang.org/
 Organization Email
-Organization Role	EFO_0001731
-Person Last Name	Harrison
-Person Initials	W
-Person First Name	Peter
-Person Email	peter\@ebi.ac.uk
-Person Role	EFO_0001741
+Organization Role EFO_0001731
+Person Last Name  Harrison
+Person Initials W
+Person First Name Peter
+Person Email  peter\@ebi.ac.uk
+Person Role EFO_0001741
 Publication PubMed ID 25854118
 
 [SCD]
-Sample Name	Sample Accession	Group Name	Group Accession
-		$group_name	$group_id
+Sample Name Sample Accession  Group Name  Group Accession
+    $group_name $group_id
 END
 
   # BioSamples validation returns output with sorted scd lines
