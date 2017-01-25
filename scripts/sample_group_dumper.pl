@@ -68,12 +68,12 @@ Use either -sample_group_id, -search_tag_field and -search_tag_value, or -json_s
 
 use strict;
 use warnings;
-use Bio::Metadata::Validate::Support::BioSDLookup;
 use List::Util qw(any none);
 use Data::Compare;
 use Cwd;
 use autodie;
-use JSON;
+use WWW::Mechanize;
+use JSON -support_by_pp;
 use Data::Dumper;
 use List::Uniq qw(uniq);
 use Getopt::Long;
@@ -550,63 +550,53 @@ sub dynamic_property_headers {
 }
 
 sub biosample_ids_to_entities {
-  my ( $sample_ids, $inherit_attributes ) = @_;
+  my ( $sample_ids, $inherit_attributes ) = @_; 
   my @samples;
-
-  my $biosd_lookup = Bio::Metadata::Validate::Support::BioSDLookup->new();
-  my $biosd_session = $biosd_lookup->biosd_session(); 
-
-
   for my $sample_id (@$sample_ids) {
-
-    my $entity = $biosd_lookup->fetch_sample($sample_id);
-    
-    if (!$entity){
+    my $url = "https://www.ebi.ac.uk/biosamples/api/samples/".$sample_id;
+    my $biosd_lookup = fetch_biosample_json($url);
+    if (!$biosd_lookup){
       carp "No biosample entry for $sample_id";#TODO - should this croak?
       next;
     }
-    push @samples, $entity;
+    my $entity = Bio::Metadata::Entity->new($biosd_lookup);
+    push @samples, $entity;    
     
-    $entity->add_attribute( { name => 'Sample Name', value => $entity->id } );
+    $entity->add_attribute( { name => 'Sample Name', value => $biosd_lookup->{accession} } );
     $entity->id($sample_id);
-    
-    my $sample = $biosd_session->fetch_sample($sample_id);
-    my $groups = $sample->groups;
-    my @organisations = grep {$_ ne 'EMBL-EBI' } map {$_->name} (map {@{$_->organizations}} @$groups);
-    @organisations = sort {$a cmp $b} uniq(@organisations);
-    for my $organisation (@organisations){
-      $entity->add_attribute({name => 'Centre', value => $organisation, allow_further_validation => 0});
-    }
-
-    
+    my $sample = $biosd_lookup;
   }
-
   @samples = sort { $a->{id} cmp $b->{id} } @samples;
-
   return \@samples;
 }
 
 sub fetch_sample_ids_matching_tag_and_value {
   my ( $search_tag_field, $search_tag_value ) = @_;
-
-  my $samples = BioSD::search_for_samples($search_tag_value);
-  return [
-    map { $_->id }
-      grep {
-      $_->property($search_tag_field)
-        && defined $_->property($search_tag_field)->values
-        && any { $_ eq $search_tag_value }
-      @{ $_->property($search_tag_field)->values }
-
-      } @$samples
-  ];
+  my $url = "https://www.ebi.ac.uk/biosamples/api/samples/search/findByText?text=".$search_tag_field.":".$search_tag_value;
+  my @pages = fetch_biosamples_json($url);
+  my @samples;
+  foreach my $page (@pages){
+    foreach my $sample (@{$page->{samples}}){
+      push(@samples, $sample->{accession});
+    }
+  }
+  return \@samples;
 }
 
 sub fetch_sample_ids_in_group {
   my ($group_id) = @_;
-  my $group = BioSD::fetch_group($group_id);
-  confess "Group $group_id was not found" unless $group;
-  return $group->sample_ids;
+  my $url = "https://www.ebi.ac.uk/biosamples/api/groups/.$group_id";
+  my @pages = fetch_biosamples_json($url);
+  confess "Group $group_id was not found" unless @pages;
+  my @samples;
+  foreach my $page (@pages){
+    foreach my $samplegroup (@{$page->{groups}}){
+      foreach my $sample (@{$samplegroup->{samples}}){
+        push(@samples, $sample);
+      }
+    }
+  }
+  return \@samples;
 }
 
 sub fetch_biosample_ids_from_rst {
@@ -668,4 +658,51 @@ sub validate_samples {
       { name => $validation_status_attribute_name, value => $v } );
   }
 
+}
+
+sub fetch_biosamples_json{
+  my ($json_url) = @_;
+
+  my $browser = WWW::Mechanize->new();
+  $browser->get( $json_url );
+  my $content = $browser->content();
+  my $json = new JSON;
+  my $json_text = $json->decode($content);
+  
+  my @pages;
+  foreach my $item ($json_text->{_embedded}){ #Store page 0
+    push(@pages, $item);
+  }
+  
+  while ($$json_text{_links}{next}{href}){  # Iterate until no more pages using HAL links
+    $browser->get( $$json_text{_links}{next}{href});  # Get next page
+    $content = $browser->content();
+    $json_text = $json->decode($content);
+    foreach my $item ($json_text->{_embedded}){
+      push(@pages, $item);  # Store each additional page
+    }
+  }
+  return @pages;
+}
+
+sub fetch_biosample_json{
+  my ($json_url) = @_;
+
+  my $browser = WWW::Mechanize->new();
+  $browser->get( $json_url );
+  my $content = $browser->content();
+  my $json = new JSON;
+  my $json_text = $json->decode($content);
+  return $json_text;
+}
+
+sub fetch_relations_json{
+  my ($json_url) = @_;
+
+  my $browser = WWW::Mechanize->new();
+  $browser->get( $json_url );
+  my $content = $browser->content();
+  my $json = new JSON;
+  my $json_text = $json->decode($content);
+  return $json_text;
 }
