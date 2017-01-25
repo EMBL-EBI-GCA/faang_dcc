@@ -1,0 +1,10 @@
+{
+  rules => [
+    {'FAANG Samples' => '/nfs/public/rw/reseq-info/faang/rule_sets/faang-metadata/rulesets/faang_samples.metadata_rules.json'},
+    {'FAANG Experiments' => '/nfs/public/rw/reseq-info/faang/rule_sets/faang-metadata/rulesets/faang_experiments.metadata_rules.json'},
+  ],
+  brand_img => 'http://www.faang.org/icons/FAANG/FAANG_logo2_3.png',
+  resource_name => 'FAANG metadata tools',
+  resource_description => 'Tools for validating FAANG metadata, developed and hosted by EMBL-EBI',
+  contact_email => 'faang-dcc@ebi.ac.uk'
+};

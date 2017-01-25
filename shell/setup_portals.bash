@@ -1,5 +1,7 @@
 #!/bin/bash
 
+WEBSITE_CONF=`dirname $0`/../website_config_files
+
 ME=`whoami`
 if [ $ME != reseq_adm ]; then
   echo run this script as reseq_adm
@@ -32,6 +34,7 @@ git clone ssh://git@github.com/FAANG/faang-portal-backend.git $FAANG_WEBSITE_BAS
 
 umask 0002
 mkdir -p $FAANG_WEBSITE_BASE/var/log/hx $FAANG_WEBSITE_BASE/var/run/hx
+cp -r $WEBSITE_CONF/faang_website_staging/conf* $FAANG_WEBSITE_BASE/.
 
 FAANG_WEBSITE_BASE=$BASE/faang_website
 
@@ -42,6 +45,7 @@ git clone ssh://git@github.com/FAANG/faang-portal-frontend.git $FAANG_WEBSITE_BA
 
 umask 0002
 mkdir -p $FAANG_WEBSITE_BASE/var/log/hx $FAANG_WEBSITE_BASE/var/run/hx
+cp -r $WEBSITE_CONF/faang_website/conf* $FAANG_WEBSITE_BASE/.
 
 FAANG_BASE=$BASE/faang_staging
 
@@ -51,9 +55,13 @@ git clone ssh://git@github.com/FAANG/faang-metadata.git $FAANG_BASE/rule_sets/fa
 git clone ssh://git@github.com/FAANG/faang-validate.git $FAANG_BASE/www/faang-validate
 git clone ssh://git@github.com/EMBL-EBI-GCA/BioSD.git $FAANG_BASE/www/BioSD
 
+cp -r $WEBSITE_CONF/faang_staging/conf* $FAANG_BASE/.
+
 FAANG_BASE=$BASE/faang
 umask 0022
 mkdir -p $FAANG_BASE $FAANG_BASE/www $FAANG_BASE/rule_sets 
 git clone ssh://git@github.com/FAANG/faang-metadata.git $FAANG_BASE/rule_sets/faang-metadata
 git clone ssh://git@github.com/FAANG/faang-validate.git $FAANG_BASE/www/faang-validate
 git clone ssh://git@github.com/EMBL-EBI-GCA/BioSD.git $FAANG_BASE/www/BioSD
+
+cp -r $WEBSITE_CONF/faang/conf* $FAANG_BASE/.

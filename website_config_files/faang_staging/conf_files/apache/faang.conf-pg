@@ -1,0 +1,70 @@
+<IfModule !deflate_module>
+  LoadModule deflate_module modules/mod_deflate.so
+</IfModule>
+
+<IfModule deflate_module>
+  SetOutputFilter DEFLATE
+
+  AddOutputFilterByType DEFLATE text/plain text/html text/xml application/json
+
+  # Don't compress binaries
+  SetEnvIfNoCase Request_URI .(?:exe|t?gz|zip|iso|tar|bz2|sit|rar) no-gzip dont-vary
+
+  # Don't compress images
+  SetEnvIfNoCase Request_URI .(?:gif|jpe?g|jpg|ico|png)  no-gzip dont-vary
+
+  # Don't compress PDFs
+  SetEnvIfNoCase Request_URI .pdf no-gzip dont-vary
+
+  # Netscape 4.X has some problems
+  BrowserMatch ^Mozilla/4 gzip-only-text/html
+
+  # Netscape 4.06-4.08 have some more problems
+  BrowserMatch ^Mozilla/4.0[678] no-gzip
+
+  # MSIE masquerades as Netscape, but it is fine
+  BrowserMatch \bMSIE !no-gzip !gzip-only-text/html
+
+  # Make sure proxies don't deliver the wrong content
+  Header append Vary User-Agent env=!dont-vary
+</IfModule>
+
+
+LoadModule perl_module /nfs/public/rw/homes/reseq_adm/apache-perlbrew/usr/lib64/httpd/modules/mod_perl.so
+#apache modules
+PerlSwitches -I/nfs/public/rw/homes/reseq_adm/apache-perlbrew/lib/site_perl/5.16.3/x86_64-linux/auto
+PerlSwitches -I/nfs/public/rw/homes/reseq_adm/apache-perlbrew/lib/site_perl/5.16.3/x86_64-linux
+#app specific modules
+PerlSwitches -I/nfs/public/rw/reseq-info/faang/www/validate-metadata/local/lib/perl5
+PerlSwitches -I/nfs/public/rw/reseq-info/faang/www/BioSD/lib
+PerlSwitches -I/nfs/public/rw/reseq-info/faang/www/validate-metadata/lib
+
+LogLevel Debug
+
+<VirtualHost *:80>
+  ServerName www.ebi.ac.uk
+  ServerAlias ves-pg-e7.ebi.ac.uk
+  ServerAlias ves-pg-e7
+
+  <Proxy *>
+    Order allow,deny
+    Allow from all
+  </Proxy>
+
+  <Perl>
+    $ENV{PLACK_ENV} = 'production';
+    $ENV{MOJO_HOME} = '/nfs/public/rw/reseq-info/faang/www/validate-metadata/web';
+    $ENV{MOJO_MODE} = 'production';
+    $ENV{MOJO_CONFIG} = '/nfs/public/rw/reseq-info/faang/conf_files/mojo/validate_metadata.mojo_conf';
+  </Perl>
+
+  <Location /vg/faang>
+    Order allow,deny
+    Allow from all	
+    SetHandler perl-script
+    PerlResponseHandler Plack::Handler::Apache2
+    PerlSetVar psgi_app /nfs/public/rw/reseq-info/faang/www/validate-metadata/web/validate_metadata.pl
+  </Location>
+
+</VirtualHost>
+
