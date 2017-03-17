@@ -78,6 +78,7 @@ use Data::Dumper;
 use List::Uniq qw(uniq);
 use Getopt::Long;
 use Carp;
+use Bio::Metadata::Validate::Support::BioSDLookup;
 
 my $validation_status_attribute_name = 'Metadata validation status';
 
