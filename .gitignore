@@ -20,3 +20,4 @@ nytprof.out
 /_eumm/
 ._*
 .DS_Store
+scripts/*.xsd
