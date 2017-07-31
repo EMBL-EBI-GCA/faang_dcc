@@ -1,21 +1,4 @@
 #!/usr/bin/perl
-use JSON;
-use strict;
-use Data::Dumper; #library for debugging purpose
-use XML::Simple; #library for parsing xsd files
-
-my $baseUrl = 'https://rawgithub.com/enasequence/schema/master/src/main/resources/uk/ac/ebi/ena/sra/schema/';
-
-my $xmlReader = new XML::Simple;
-#&parseXSD("SRA.experiment.xsd","typeLibrarySource");
-#&parseXSD("SRA.experiment.xsd","LIBRARY_LAYOUT");
-#&parseXSD("SRA.run.xsd","checksum_method");
-&parseXSD("SRA.run.xsd","ascii_offset");
-#&parseXSD("SRA.study.xsd","existing_study_type");
-#&parseXSD("SRA.common.xsd","typeBGISEQModel");
-#&parseXSD("SRA.common.xsd","PlatformType");
-#exit;
-
 #############################
 ##BACKGROUND: 
 ##		In the FAANG metadata preparation, at the moment, no ENA validation is provided which makes it very likely that the user uses the values not valid in the ENA metadata, 
@@ -36,6 +19,14 @@ my $xmlReader = new XML::Simple;
 #by searching "xs:restriction" and "xs:choice", a list of elements/attributes with limited values is compiled and saved into "restricted field list.tsv"
 #then manually comparing to the experiment metadata xls file, find the columns mapped to the found elements/attributes
 #in the tsv files, lines starting with "#" or empty lines should be ignored. Each line should have four columns in the order of 1) column name, 2) which sheet this column coming from, 3) the xsd file name and 4)attribute/element name
+use JSON;
+use strict;
+use Data::Dumper; #library for debugging purpose
+use XML::Simple; #library for parsing xsd files
+
+my $baseUrl = 'https://rawgithub.com/enasequence/schema/master/src/main/resources/uk/ac/ebi/ena/sra/schema/';
+
+my $xmlReader = new XML::Simple;
 
 $"=">,<";#for debugging purpose
 #my %toCheck; #current implementation reads the xsd file every time, ideally should only be read once. As the xsd file is normally small, not worth spending extra time coding for that
