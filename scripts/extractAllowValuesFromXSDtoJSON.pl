@@ -30,9 +30,10 @@ my $xmlReader = new XML::Simple;
 
 $"=">,<";#for debugging purpose
 #my %toCheck; #current implementation reads the xsd file every time, ideally should only be read once. As the xsd file is normally small, not worth spending extra time coding for that
+&usage unless (scalar @ARGV == 1);
 
 #read in the pre-compiled TSV file
-open TSV, "restricted field list.tsv" || die "Could not find the tsv file\n";
+open TSV, "$ARGV[0]" || die "Could not find the tsv file\n";
 #the one would be used in Excel for data validation (added by a separate VBA code)
 open OUT, ">limitedValuesList.tsv";
 print "deleting all existing xsd files to make sure the xsd file parsed are up-to-date\n";
@@ -197,6 +198,14 @@ sub testWriteToJSON(){
 #$json = $json->pretty([$enable])
 	my $json_str = encode_json (\@elmts);
 	print "$json_str\n";
+}
+
+sub usage(){
+	print "Usage: perl extractAllowValuesFromXSDtoJSON.pl <restricted field list>\n";
+	print "The restricted field list must be a TSV file and have four columns in the order:\n";
+	print "1. the name of the columns requiring limited values\n2. the tab (aka work sheet) name which contains those columns\n";
+	print "3. the name of xsd file and\n4. element/attribute containing the allowed values.\n";
+	exit 1;
 }
 
 #         "allow_multiple": 1,
