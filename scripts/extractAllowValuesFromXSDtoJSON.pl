@@ -32,6 +32,13 @@ $"=">,<";#for debugging purpose
 #my %toCheck; #current implementation reads the xsd file every time, ideally should only be read once. As the xsd file is normally small, not worth spending extra time coding for that
 &usage unless (scalar @ARGV == 1);
 
+#uncomment to debug individual term
+#&parseXSD("SRA.common.xsd","SpotDescriptorType");
+#&parseXSD("SRA.common.xsd","SequencingDirectivesType");
+#&parseXSD("SRA.common.xsd","SAMPLE_DEMUX_DIRECTIVE");
+#&parseXSD("SRA.submission.xsd","ACTION");
+#exit;
+
 #read in the pre-compiled TSV file
 open TSV, "$ARGV[0]" || die "Could not find the tsv file\n";
 #the one would be used in Excel for data validation (added by a separate VBA code)
@@ -76,22 +83,32 @@ sub checkXSDfile(){
 sub parseXSD(){
 	my $xsdFile = $_[0];
 	my $term = $_[1];
-	print "Checking $term in the xsd file $xsdFile\n";
+	print "Checking <$term> in the xsd file <$xsdFile>\n";
 	my $data = $xmlReader->XMLin("$xsdFile");
 	my %result;
 	#walk through all nodes (subhashes) starting from the root element
 	#which is implemented by adding all hash refs into an array (@nodes) and take one out of the array, when the array is empty, the tree has been checked thoroughly
 	my @nodes;
+#	print Dumper($data);
 	push (@nodes,$data);
 	my $found; # the ref of the node (a sub hash) matching to the term
 	while (scalar @nodes>0){ #the node array is not empty
 		my %curr = %{shift (@nodes)};
 		foreach (keys %curr){
+
 			if($term eq $_){ #found the term, quit the current searching loop and parse the matching node only
 				$found = $curr{$_};
 				print "found for $term\n";
 	#			print Dumper($found);exit;
 				last;
+			}
+			#if there are extra attribute in the element, the name will be 
+			if ($_ eq "xs:element"){
+				if(exists $curr{$_}{name} && $curr{$_}{name} eq $term){
+					$found = $curr{$_};
+					print "found for $term\n";
+					last;
+				}
 			}
 			#depends on the type of the value
 			my $value = $curr{$_};
@@ -112,6 +129,8 @@ sub parseXSD(){
 			}
 		}
 	}
+#	print Dumper($found);
+	die "NOT found <$term>\n" unless (defined($found));
 
 	@nodes = (); #recycle the data structure to walk through the found node
 	push (@nodes,$found);
