@@ -30,7 +30,16 @@ my $xmlReader = new XML::Simple;
 
 $"=">,<";#for debugging purpose
 #my %toCheck; #current implementation reads the xsd file every time, ideally should only be read once. As the xsd file is normally small, not worth spending extra time coding for that
-&usage unless (scalar @ARGV == 1);
+
+my $numArg = scalar @ARGV;
+&usage() unless ($numArg == 1 || $numArg == 2);
+
+my $flag = 0;
+if ($numArg == 2){
+	&usage() unless ($ARGV[1]=~/^\d$/);
+	&usage() if ($ARGV[1] != 1 && $ARGV[1] != 0);
+	$flag = $ARGV[1]; 
+}
 
 #uncomment to debug individual term
 #&parseXSD("SRA.common.xsd","SpotDescriptorType");
@@ -52,7 +61,9 @@ while (my $line = <TSV>){
 	next if (length $line==0);
 	next if (substr($line,0,1) eq "#");
 	my  ($columnName, $sheet, $xsdFile, $entity) = split("\t",$line);
-	print OUT "$columnName\t$sheet\t$entity";
+	print OUT "$columnName\t$sheet\t";
+	print OUT "$xsdFile\t" if ($flag == 1);
+	print OUT "$entity";
 	&checkXSDfile($xsdFile);
 	my %hash = %{&parseXSD($xsdFile,$entity)};
 	$hash{name} = $columnName;
@@ -220,10 +231,11 @@ sub testWriteToJSON(){
 }
 
 sub usage(){
-	print "Usage: perl extractAllowValuesFromXSDtoJSON.pl <restricted field list>\n";
-	print "The restricted field list must be a TSV file and have four columns in the order:\n";
+	print "Usage: perl extractAllowValuesFromXSDtoJSON.pl <restricted field list> [flag indicating whether including xsd file in result]\n";
+	print "The restricted field list contains the information of element/attributes which have limited allowed values in the xsd files. It must be a TSV file and have four columns in the order:\n";
 	print "1. the name of the columns requiring limited values\n2. the tab (aka work sheet) name which contains those columns\n";
 	print "3. the name of xsd file and\n4. element/attribute containing the allowed values.\n";
+	print "The flag can only have two values: 1 for including or 0 for not including (default value).\n";
 	exit 1;
 }
 
