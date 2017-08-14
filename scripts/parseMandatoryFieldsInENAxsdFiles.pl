@@ -18,6 +18,7 @@ my $xmlReader = new XML::Simple;
 my %elementToSkip;
 #known elements definitely do NOT contain any attribute or element as its child nodes
 my @elementToSkip = qw/xs:import xs:annotation xs:documentation xmlns:com xmlns:xs xs:restriction/;
+
 foreach (@elementToSkip){
 	$elementToSkip{$_} = 1;
 }
@@ -25,14 +26,21 @@ foreach (@elementToSkip){
 my $numArg = scalar @ARGV;
 &usage() unless ($numArg == 0);
 $"="\t";
+my %typesInCommon;
+#using typeglob way to introduce a constant variable
+*COMMON_XSD = \"SRA.common.xsd";
+our $COMMON_XSD;
+#this statement needs to be executed first, as other xsd files may use types defined in common.xsd
+&parseXSD($COMMON_XSD);
+
 #&parseXSD("SRA.sample.xsd");
+#&parseXSD("SRA.experiment.xsd");
 #&parseXSD("SRA.study.xsd");
-#&parseXSD("SRA.common.xsd");
 #&parseXSD("SRA.submission.xsd");
 #exit;
 
 #list of xsd files to check
-my @xsdFiles = qw/SRA.experiment.xsd SRA.run.xsd SRA.sample.xsd SRA.study.xsd SRA.submission.xsd SRA.common.xsd/;
+my @xsdFiles = qw/SRA.experiment.xsd SRA.run.xsd SRA.sample.xsd SRA.study.xsd SRA.submission.xsd/;
 
 open OUT, ">mandatoryFieldsInENAxsdFiles.tsv";
 print OUT "xsd file\ttype\tname\telement type\tpath\n";
@@ -61,6 +69,8 @@ sub parseXSD(){
 	my $data = $xmlReader->XMLin("$xsdFile");
 #	print Dumper($data);
 #	return;
+
+	#parse the xsd file and save into the middle data structure %result
 	my %result;
 	#walk through all nodes (subhashes) starting from the root element
 	#which is implemented by adding all hash refs into an array (@nodes) and take one out of the array, when the array is empty, the tree has been checked thoroughly
@@ -83,8 +93,9 @@ sub parseXSD(){
 			#the attribute is straightforward, looking for use 
 			if ($_ eq "xs:attribute"){#Attributes are optional by default. To specify that the attribute is required, use the "use" attribute e.g. <xs:attribute name="lang" type="xs:string" use="required"/>
 				if (exists $curr{$_}{use} && $curr{$_}{use} eq "required"){
-					$path = substr($path,2) if((length $path)>0);#remove the first :: as $path initialized as "", then "$path::$_"
-					print OUT "$xsdFile\tattribute\t$curr{$_}{name}\tNA\t$path\n";
+					$path = substr($path,2) if(substr($path,0,2) eq "::");#remove the first :: as $path initialized as "", then "$path::$_"
+#					print OUT "$xsdFile\tattribute\t$curr{$_}{name}\tNA\t$path\n";
+					$result{$path}{$curr{$_}{name}}{type}="NA";
 				}
 				next;
 			}
@@ -93,14 +104,18 @@ sub parseXSD(){
 			if ($_ eq "xs:element"){
 				if(exists $curr{$_}{name}){
 					unless (exists $curr{$_}{minOccurs} && $curr{$_}{minOccurs} eq "0"){
-						$path = substr($path,2) if((length $path)>0);#remove the first :: as $path initialized as "", then "$path::$_"
-						print OUT "$xsdFile\telement\t$curr{$_}{name}\t" ;
+						$path = substr($path,2) if(substr($path,0,2) eq "::");#remove the first :: as $path initialized as "", then "$path::$_"
+#						print OUT "$xsdFile\telement\t$curr{$_}{name}\t";
+						my $type = "";
 						if (exists $curr{$_}{type}){
-							print OUT "$curr{$_}{type}";
+#							print OUT "$curr{$_}{type}";
+							$type = "$curr{$_}{type}";
 						}elsif(exists $curr{$_}{"xs:complexType"} || exists $curr{$_}{"xs:simpleType"}){
-							print OUT "inline type";
+#							print OUT "inline type";
+							$type = "inline type";
 						}
-						print OUT "\t$path\n" ;
+#						print OUT "\t$path\n" ;
+						$result{$path}{$curr{$_}{name}}{type}=$type;
 					}
 				}
 			}
@@ -130,14 +145,18 @@ sub parseXSD(){
 					push (@paths, $currPath);
 					unless (substr($_,0,3) eq "xs:"){
 						if ($parent eq "xs:element"){
-							$path = substr($path,2) if((length $path)>0);#remove the first :: as $path initialized as "", then "$path::$_"
-							print OUT "$xsdFile\telement\t$_\t";
+							$path = substr($path,2) if(substr($path,0,2) eq "::");#remove the first :: as $path initialized as "", then "$path::$_"
+							my $type = "";
+#							print OUT "$xsdFile\telement\t$_\t";
 							if (exists $curr{$_}{type}){
-								print OUT "$curr{$_}{type}";
+#								print OUT "$curr{$_}{type}";
+								$type = "$curr{$_}{type}";
 							}elsif(exists $curr{$_}{"xs:complexType"} || exists $curr{$_}{"xs:simpleType"}){
-								print OUT "inline type";
+#								print OUT "inline type";
+								$type = "inline type";
 							}
-							print OUT "\t$path\n" ;
+#							print OUT "\t$path\n" ;
+							$result{$path}{$_}{type} = $type;
 						}
 					}
 				}
@@ -146,6 +165,130 @@ sub parseXSD(){
 			}
 		}
 	}
+#	print Dumper(\%result);
+	#some xsd files use types defined in the SRA.common.xsd
+	if ($xsdFile eq $COMMON_XSD){
+		%typesInCommon = %result;
+		return;
+	}
+	#in the %result, there are three types: 
+	#1) elements at the root level in the xsd file (under key '')
+	#2) type defined separated (under multiple keys having the name of types) 
+	#3) sub_elements defined in root level elements (under multiple keys having the name containing ::) 
+	my @sub_elements;
+	foreach my $elmt(keys %result){
+		next if ($elmt eq "");
+		my $len = scalar (split ("::",$elmt));
+		if ($len>1){
+			push (@sub_elements,$elmt);
+		}
+	}
+#	print Dumper(\@sub_elements);
+	my %type_element_mapping;
+	my @toPrint;
+	#for every element at the root level
+	foreach my $root_level_element(keys %{$result{""}}){
+		my @todo;
+		my @parents;
+		my @types;
+		my $type = $result{""}{$root_level_element}{type};
+#		print "$root_level_element with type $type\n";next;
+		push (@toPrint,&printEntity($xsdFile,$root_level_element,$type,""));
+
+		if (exists $result{$type}){
+			$type_element_mapping{$type}{$root_level_element}=1;
+			foreach my $element_in_type(keys %{$result{$type}}){
+				push (@todo, $element_in_type);
+				push (@parents, $type); 
+				push (@types, $result{$type}{$element_in_type}{type});
+			}
+
+			while (scalar @todo>0){
+				my $curr = shift @todo;
+				my $parent = shift @parents;
+				my $type = shift @types;
+
+				push (@toPrint,&printEntity($xsdFile,$curr, $type,$parent));
+				if ($type eq "inline type"){
+					my $toMatch="$parent::$curr";
+					my @candidates;
+					my $maxLen = -1;
+					foreach my $candidate(@sub_elements){
+						my $idx = rindex($toMatch,$candidate);
+						if ($idx>-1){
+							my $len = length $toMatch;
+							my $canLen = length $candidate;
+							$maxLen = $canLen if ($canLen > $maxLen);
+							if(($canLen+$idx)==$len){#match at the end
+								push (@candidates,$candidate);
+							}
+						}
+					}
+					foreach my $candidate(@candidates){
+						if (length $candidate == $maxLen){
+							my %hash = %{$result{$candidate}};
+							foreach my $name (keys %hash){
+								unshift (@todo, $name);
+								unshift (@parents, $toMatch);
+								unshift (@types, $hash{$name}{type});
+							}
+						}
+					}
+				}elsif($type=~/^com:/){#the type refers to the type defined in SRA.common.xsd
+					my $actualType = $';
+#					print "$actualType\n";
+#					print "found in common\n" if (exists $typesInCommon{$actualType});
+				}elsif($type=~/^xs:/){#the primitive type, e.g. xs:int
+				}else{#the type defined separately
+					if (exists $result{$type}){
+						$type_element_mapping{$type}{$curr}=1;
+						foreach my $element_in_type(keys %{$result{$type}}){
+							push (@todo, $element_in_type);
+							push (@parents, "$parent::$type"); 
+							push (@types, $result{$type}{$element_in_type}{type});
+						}
+					}
+				}
+			}
+		}
+		push (@toPrint,"");
+	}
+
+#	print Dumper(\%type_element_mapping);
+	foreach my $line(@toPrint){
+		if ($line eq ""){
+			print "\n";
+			next;
+		}
+		my @tmp = split("\t",$line);
+		my @arr = split("::",$tmp[3]);
+		my $str = "";
+		foreach my $elmt(@arr){
+			if (exists $type_element_mapping{$elmt}){
+				my @names = sort {$a cmp $b} keys %{$type_element_mapping{$elmt}};
+				my $abc = join("|",@names);
+				$str .= "::$abc";
+			}else{
+				$str .= "::$elmt";
+			}
+		}
+		$str = substr($str,2);
+		$tmp[3] = $str;
+		$line = join("\t",@tmp);
+		print "$line\n";
+	}
+}
+
+sub printEntity(){
+	my ($xsd,$name,$type,$parent)=@_;
+	my $result = "$xsd\t";
+	if ($type eq "NA"){
+		$result .= "attribute\t$name\t";
+	}else{
+		$result .= "element\t$name\t";
+	}
+	$result .= "$parent\t";
+	return $result;
 }
 
 sub usage(){
