@@ -10,6 +10,14 @@ use JSON;
 use strict;
 use Data::Dumper; #library for debugging purpose
 use XML::Simple; #library for parsing xsd files
+$"="\t";
+#my $haha = "iejifh|jiehg";
+#my @haha = split(/\|/,$haha);
+#print "$haha\n@haha\n";
+#exit;
+
+my $numArg = scalar @ARGV;
+&usage() unless ($numArg == 1);
 
 my $baseUrl = 'https://rawgithub.com/enasequence/schema/master/src/main/resources/uk/ac/ebi/ena/sra/schema/';
 
@@ -18,14 +26,22 @@ my $xmlReader = new XML::Simple;
 my %elementToSkip;
 #known elements definitely do NOT contain any attribute or element as its child nodes
 my @elementToSkip = qw/xs:import xs:annotation xs:documentation xmlns:com xmlns:xs xs:restriction/;
-
 foreach (@elementToSkip){
 	$elementToSkip{$_} = 1;
 }
 
-my $numArg = scalar @ARGV;
-&usage() unless ($numArg == 0);
-$"="\t";
+open IN, "$ARGV[0]" or die "Could not find the specified file $ARGV[0]";
+my %cv_values;
+while (my $line=<IN>){
+	chomp($line);
+	my (undef,undef,$file,$tag,undef,@values) = split ("\t",$line);
+	my $str = join("|",@values);
+	$cv_values{$file}{$tag} = $str;
+#	print "file $file\ttag <$tag>\t<$str>\n";
+}
+
+my %json_result;
+
 my %typesInCommon;
 #using typeglob way to introduce a constant variable
 *COMMON_XSD = \"SRA.common.xsd";
@@ -43,7 +59,7 @@ our $COMMON_XSD;
 my @xsdFiles = qw/SRA.experiment.xsd SRA.run.xsd SRA.sample.xsd SRA.study.xsd SRA.submission.xsd/;
 
 open OUT, ">mandatoryFieldsInENAxsdFiles.tsv";
-print OUT "xsd file\ttype\tname\telement type\tpath\n";
+print OUT "xsd file\ttype\tname\tpath\tdescription\tallowed values\n";
 #print "deleting all existing xsd files to make sure the xsd file parsed are up-to-date\n";
 #system ("rm *.xsd");
 
@@ -52,7 +68,10 @@ foreach my $xsdFile(@xsdFiles){
 	&parseXSD($xsdFile);
 }
 close OUT;
-
+my $json = to_json(\%json_result,{pretty=>1});
+open JSON_OUT,">mandatoryFieldsInENAxsdFiles.json";
+print JSON_OUT "$json\n";
+close JSON_OUT;
 #check the existance of the xsd file, if not, download from github directly using curl
 sub checkXSDfile(){
 	my $file = $_[0];
@@ -96,6 +115,7 @@ sub parseXSD(){
 					$path = substr($path,2) if(substr($path,0,2) eq "::");#remove the first :: as $path initialized as "", then "$path::$_"
 #					print OUT "$xsdFile\tattribute\t$curr{$_}{name}\tNA\t$path\n";
 					$result{$path}{$curr{$_}{name}}{type}="NA";
+					$result{$path}{$curr{$_}{name}}{desc} = $curr{$_}{"xs:annotation"}{"xs:documentation"} if (exists $curr{$_}{"xs:annotation"} && exists $curr{$_}{"xs:annotation"}{"xs:documentation"});
 				}
 				next;
 			}
@@ -116,6 +136,7 @@ sub parseXSD(){
 						}
 #						print OUT "\t$path\n" ;
 						$result{$path}{$curr{$_}{name}}{type}=$type;
+						$result{$path}{$curr{$_}{name}}{desc} = $curr{$_}{"xs:annotation"}{"xs:documentation"} if (exists $curr{$_}{"xs:annotation"} && exists $curr{$_}{"xs:annotation"}{"xs:documentation"});
 					}
 				}
 			}
@@ -157,6 +178,7 @@ sub parseXSD(){
 							}
 #							print OUT "\t$path\n" ;
 							$result{$path}{$_}{type} = $type;
+							$result{$path}{$_}{desc} = $curr{$_}{"xs:annotation"}{"xs:documentation"} if (exists $curr{$_}{"xs:annotation"} && exists $curr{$_}{"xs:annotation"}{"xs:documentation"});
 						}
 					}
 				}
@@ -165,11 +187,10 @@ sub parseXSD(){
 			}
 		}
 	}
-#	print Dumper(\%result);
+#	print Dumper(\%result);return;
 	#some xsd files use types defined in the SRA.common.xsd
 	if ($xsdFile eq $COMMON_XSD){
 		%typesInCommon = %result;
-		return;
 	}
 	#in the %result, there are three types: 
 	#1) elements at the root level in the xsd file (under key '')
@@ -192,8 +213,10 @@ sub parseXSD(){
 		my @parents;
 		my @types;
 		my $type = $result{""}{$root_level_element}{type};
+		my $desc = "";
+		$desc = $result{""}{$root_level_element}{desc} if (exists $result{""}{$root_level_element}{desc});
 #		print "$root_level_element with type $type\n";next;
-		push (@toPrint,&printEntity($xsdFile,$root_level_element,$type,""));
+		push (@toPrint,&printEntity($xsdFile,$root_level_element,$type,"",$desc));
 
 		if (exists $result{$type}){
 			$type_element_mapping{$type}{$root_level_element}=1;
@@ -257,7 +280,7 @@ sub parseXSD(){
 #	print Dumper(\%type_element_mapping);
 	foreach my $line(@toPrint){
 		if ($line eq ""){
-			print "\n";
+			print OUT "\n";
 			next;
 		}
 		my @tmp = split("\t",$line);
@@ -266,7 +289,7 @@ sub parseXSD(){
 		foreach my $elmt(@arr){
 			if (exists $type_element_mapping{$elmt}){
 				my @names = sort {$a cmp $b} keys %{$type_element_mapping{$elmt}};
-				my $abc = join("|",@names);
+				my $abc = join("\|",@names);
 				$str .= "::$abc";
 			}else{
 				$str .= "::$elmt";
@@ -275,23 +298,57 @@ sub parseXSD(){
 		$str = substr($str,2);
 		$tmp[3] = $str;
 		$line = join("\t",@tmp);
-		print "$line\n";
+		print OUT "$line\n";
+		&saveIntoJson($line);
+#		print "$line\n";
 	}
 }
 
 sub printEntity(){
-	my ($xsd,$name,$type,$parent)=@_;
+	my ($xsd,$name,$type,$parent,$desc)=@_;
 	my $result = "$xsd\t";
 	if ($type eq "NA"){
 		$result .= "attribute\t$name\t";
 	}else{
 		$result .= "element\t$name\t";
 	}
-	$result .= "$parent\t";
+	if ($desc =~/^\s+/){
+		$desc = $';
+	}
+	if ($desc =~/\s+$/){
+		$desc = $`;
+	}
+	$desc =~s/\n//g;
+	$desc =~s/\t/ /g;
+	$desc =~s/ +/ /g;
+	$result .= "$parent\t$desc\t";
+	if ($type=~/^com:/){
+		$type = $';
+		$xsd = $COMMON_XSD;
+	}
+	if (exists $cv_values{$xsd}{$type}){
+		$result .= $cv_values{$xsd}{$type};
+	}elsif (exists $cv_values{$xsd}{$name}){
+		$result .= $cv_values{$xsd}{$name};
+	}
 	return $result;
 }
 
+sub saveIntoJson(){
+	my $input = $_[0];
+	my ($xsd,$type,$name,$path,$desc,$value) = split("\t",$input);
+	my %hash;
+	$hash{name}=$name;
+	$hash{path}=$path;
+	$hash{desc}=$desc if (length $desc>0);
+	if(length $value>0){
+		my @arr = split(/\|/,$value);
+		@{$hash{allowed_values}}=@arr;
+	}
+	push(@{$json_result{$xsd}{$type}},\%hash);
+}
+
 sub usage(){
-	print "Usage: perl parseMandatoryFieldsInENAxsdFiles.pl\n";
+	print "Usage: perl parseMandatoryFieldsInENAxsdFiles.pl <allowed values list>\n";
 	exit 1;
 }

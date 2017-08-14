@@ -1,0 +1,58 @@
+xsd file	type	name	path	description	allowed values
+SRA.experiment.xsd	element	EXPERIMENT_SET		An EXPERMENT_SET is a container for a set of experiments and a common namespace.
+SRA.experiment.xsd	element	EXPERIMENT	EXPERIMENT_SET
+SRA.experiment.xsd	element	STUDY_REF	EXPERIMENT_SET::EXPERIMENT
+SRA.experiment.xsd	element	DESIGN	EXPERIMENT_SET::EXPERIMENT
+SRA.experiment.xsd	element	PLATFORM	EXPERIMENT_SET::EXPERIMENT		ILLUMINA|CAPILLARY|PACBIO_SMRT|COMPLETE_GENOMICS|HELICOS|OXFORD_NANOPORE|LS454|ABI_SOLID|ION_TORRENT|BGISEQ
+SRA.experiment.xsd	element	DESIGN_DESCRIPTION	EXPERIMENT_SET::EXPERIMENT::DESIGN
+SRA.experiment.xsd	element	SAMPLE_DESCRIPTOR	EXPERIMENT_SET::EXPERIMENT::DESIGN
+SRA.experiment.xsd	element	LIBRARY_DESCRIPTOR	EXPERIMENT_SET::EXPERIMENT::DESIGN
+SRA.experiment.xsd	element	LIBRARY_STRATEGY	EXPERIMENT_SET::EXPERIMENT::DESIGN::LIBRARY_DESCRIPTOR		WGS|WGA|WXS|RNA-Seq|ssRNA-seq|miRNA-Seq|ncRNA-Seq|FL-cDNA|EST|Hi-C|ATAC-seq|WCS|RAD-Seq|CLONE|POOLCLONE|AMPLICON|CLONEEND|FINISHING|ChIP-Seq|MNase-Seq|DNase-Hypersensitivity|Bisulfite-Seq|CTS|MRE-Seq|MeDIP-Seq|MBD-Seq|Tn-Seq|VALIDATION|FAIRE-seq|SELEX|RIP-Seq|ChIA-PET|Synthetic-Long-Read|Targeted-Capture|Tethered Chromatin Conformation Capture|OTHER
+SRA.experiment.xsd	element	LIBRARY_SELECTION	EXPERIMENT_SET::EXPERIMENT::DESIGN::LIBRARY_DESCRIPTOR		RANDOM|PCR|RANDOM PCR|RT-PCR|HMPR|MF|repeat fractionation|size fractionation|MSLL|cDNA|cDNA_randomPriming|cDNA_oligo_dT|PolyA|Oligo-dT|Inverse rRNA|Inverse rRNA selection|ChIP|MNase|DNase|Hybrid Selection|Reduced Representation|Restriction Digest|5-methylcytidine antibody|MBD2 protein methyl-CpG binding domain|CAGE|RACE|MDA|padlock probes capture method|other|unspecified
+SRA.experiment.xsd	element	LIBRARY_LAYOUT	EXPERIMENT_SET::EXPERIMENT::DESIGN::LIBRARY_DESCRIPTOR		PAIRED|SINGLE
+SRA.experiment.xsd	element	SINGLE	EXPERIMENT_SET::EXPERIMENT::DESIGN::LIBRARY_DESCRIPTOR::LIBRARY_LAYOUT
+SRA.experiment.xsd	element	PAIRED	EXPERIMENT_SET::EXPERIMENT::DESIGN::LIBRARY_DESCRIPTOR::LIBRARY_LAYOUT
+SRA.experiment.xsd	element	LIBRARY_SOURCE	EXPERIMENT_SET::EXPERIMENT::DESIGN::LIBRARY_DESCRIPTOR		GENOMIC|GENOMIC SINGLE CELL|TRANSCRIPTOMIC|TRANSCRIPTOMIC SINGLE CELL|METAGENOMIC|METATRANSCRIPTOMIC|SYNTHETIC|VIRAL RNA|OTHER
+
+SRA.experiment.xsd	element	EXPERIMENT	
+SRA.experiment.xsd	element	STUDY_REF	EXPERIMENT
+SRA.experiment.xsd	element	DESIGN	EXPERIMENT
+SRA.experiment.xsd	element	PLATFORM	EXPERIMENT		ILLUMINA|CAPILLARY|PACBIO_SMRT|COMPLETE_GENOMICS|HELICOS|OXFORD_NANOPORE|LS454|ABI_SOLID|ION_TORRENT|BGISEQ
+SRA.experiment.xsd	element	DESIGN_DESCRIPTION	EXPERIMENT::DESIGN
+SRA.experiment.xsd	element	SAMPLE_DESCRIPTOR	EXPERIMENT::DESIGN
+SRA.experiment.xsd	element	LIBRARY_DESCRIPTOR	EXPERIMENT::DESIGN
+SRA.experiment.xsd	element	LIBRARY_STRATEGY	EXPERIMENT::DESIGN::LIBRARY_DESCRIPTOR		WGS|WGA|WXS|RNA-Seq|ssRNA-seq|miRNA-Seq|ncRNA-Seq|FL-cDNA|EST|Hi-C|ATAC-seq|WCS|RAD-Seq|CLONE|POOLCLONE|AMPLICON|CLONEEND|FINISHING|ChIP-Seq|MNase-Seq|DNase-Hypersensitivity|Bisulfite-Seq|CTS|MRE-Seq|MeDIP-Seq|MBD-Seq|Tn-Seq|VALIDATION|FAIRE-seq|SELEX|RIP-Seq|ChIA-PET|Synthetic-Long-Read|Targeted-Capture|Tethered Chromatin Conformation Capture|OTHER
+SRA.experiment.xsd	element	LIBRARY_SELECTION	EXPERIMENT::DESIGN::LIBRARY_DESCRIPTOR		RANDOM|PCR|RANDOM PCR|RT-PCR|HMPR|MF|repeat fractionation|size fractionation|MSLL|cDNA|cDNA_randomPriming|cDNA_oligo_dT|PolyA|Oligo-dT|Inverse rRNA|Inverse rRNA selection|ChIP|MNase|DNase|Hybrid Selection|Reduced Representation|Restriction Digest|5-methylcytidine antibody|MBD2 protein methyl-CpG binding domain|CAGE|RACE|MDA|padlock probes capture method|other|unspecified
+SRA.experiment.xsd	element	LIBRARY_LAYOUT	EXPERIMENT::DESIGN::LIBRARY_DESCRIPTOR		PAIRED|SINGLE
+SRA.experiment.xsd	element	SINGLE	EXPERIMENT::DESIGN::LIBRARY_DESCRIPTOR::LIBRARY_LAYOUT
+SRA.experiment.xsd	element	PAIRED	EXPERIMENT::DESIGN::LIBRARY_DESCRIPTOR::LIBRARY_LAYOUT
+SRA.experiment.xsd	element	LIBRARY_SOURCE	EXPERIMENT::DESIGN::LIBRARY_DESCRIPTOR		GENOMIC|GENOMIC SINGLE CELL|TRANSCRIPTOMIC|TRANSCRIPTOMIC SINGLE CELL|METAGENOMIC|METATRANSCRIPTOMIC|SYNTHETIC|VIRAL RNA|OTHER
+
+SRA.run.xsd	element	RUN_SET		RUN_SET serves as a container for a set of runs and a name space for establishing referential integrity between them.
+SRA.run.xsd	element	RUN	RUN_SET
+SRA.run.xsd	element	EXPERIMENT_REF	RUN_SET::RUN
+
+SRA.run.xsd	element	RUN	
+SRA.run.xsd	element	EXPERIMENT_REF	RUN
+
+SRA.sample.xsd	element	SAMPLE_SET		SAMPLE_SET serves as a container for a set of samples and a name space for establishing referential integrity between them.
+SRA.sample.xsd	element	SAMPLE	SAMPLE_SET
+SRA.sample.xsd	element	SAMPLE_NAME	SAMPLE_SET::SAMPLE
+SRA.sample.xsd	element	TAXON_ID	SAMPLE_SET::SAMPLE::SAMPLE_NAME
+
+SRA.sample.xsd	element	SAMPLE	
+SRA.sample.xsd	element	SAMPLE_NAME	SAMPLE
+SRA.sample.xsd	element	TAXON_ID	SAMPLE::SAMPLE_NAME
+
+SRA.study.xsd	element	STUDY_SET		An STUDY_SET is a container for a set of studies and a common namespace.
+SRA.study.xsd	element	STUDY	STUDY_SET
+SRA.study.xsd	element	DESCRIPTOR	STUDY_SET::STUDY
+
+SRA.study.xsd	element	STUDY	
+SRA.study.xsd	element	DESCRIPTOR	STUDY
+
+SRA.submission.xsd	element	SUBMISSION_SET		An SUBMISSION_SET is a container for a set of studies and a common namespace.
+SRA.submission.xsd	element	SUBMISSION	SUBMISSION_SET
+
+SRA.submission.xsd	element	SUBMISSION	
+
