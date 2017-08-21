@@ -77,12 +77,14 @@ my %optionalFields = %{&parseRulesetJSON()};
 &getData($es_host,$INDEX,$SPECIMEN);
 #output and calculate the average percentage
 my %stats;
+my %statsIncluding;
 open OUT, ">optionalFieldsUsage.tsv";
-print OUT "Section\tStatus\tField\tCount\tTotal Entries\tPercentage\n";
+print OUT "Section\tStatus\tField\tTotal Entries\tCount\tPercentage\tCount including not provided\tPercentage including\n";
 foreach my $section(@sections){
 	foreach my $status(@mandatoryTypes){
 		if (exists $optionalFields{$section}{$status}){
 			foreach my $field (@{$optionalFields{$section}{$status}}){
+#				$field = &fromLowerCamelCase($field);
 				print OUT "$section\t$status\t";
 				print OUT &fromLowerCamelCase($field);
 				print OUT "\t";
@@ -95,32 +97,50 @@ foreach my $section(@sections){
 					$total = $counts{total}{$section} if (exists $counts{total}{$section});
 				}
 				my $ratio;
+				my $ratioIncluding;
+				my $includingNumber;
 				if($total==0){
 					$ratio = "NA";
+					$ratioIncluding = "NA";
+					$includingNumber = 0;
 				}else{
 					$ratio = $count/$total;
 					push (@{$stats{$section}{$status}},$ratio);
 					if ($section eq "organism" || $section eq "standard"){
 						push (@{$stats{animal}{$status}},$ratio);
+
+						$includingNumber = &getNumberUsingES($ORGANISM,$field);
+						$ratioIncluding = $includingNumber/$total;
+						push (@{$statsIncluding{animal}{$status}},$ratioIncluding);
 					}else{
 						push (@{$stats{specimen}{$status}},$ratio);
+
+						$field = &toLowerCamelCase($section).".$field";
+						$includingNumber = &getNumberUsingES($SPECIMEN,$field);
+						$ratioIncluding = $includingNumber/$total;
+						push (@{$statsIncluding{specimen}{$status}},$ratioIncluding);
 					}
 					push (@{$stats{overall}{$status}},$ratio);
+
+					push (@{$statsIncluding{$section}{$status}},$ratioIncluding);
+					push (@{$statsIncluding{overall}{$status}},$ratioIncluding);
 				}
-				print OUT "$count\t$total\t$ratio\n";
+				print OUT "$total\t$count\t$ratio\t$includingNumber\t$ratioIncluding\n";
 			}
 		}
 	}
 }
 
-print OUT "\n\nAverage Percentage\n";
+print OUT "\n\nAverage Percentage\nSection\tStatus\tExcluding\tIncluding\n";
 my @arr = ("overall","animal","specimen",@sections);
 foreach my $section(@arr){
 	foreach my $status(@mandatoryTypes){
 		if (exists $stats{$section}{$status}){
 			my @arr = @{$stats{$section}{$status}};
 			my $avg = &average(@arr);
-			print OUT "$section\t$status\t$avg\n";
+			@arr = @{$statsIncluding{$section}{$status}};
+			my $avgInc = &average(@arr);
+			print OUT "$section\t$status\t$avg\t$avgInc\n";
 		}
 	}
 }
@@ -151,16 +171,47 @@ sub getTotalNumber(){
 	$hash{aggs}{material}{terms}{field}="material.text";
 	my $requestJson = to_json(\%hash);
 #	print "$requestJson\n"; #should have the same structure as the part above after _search
+	my $jsonResult = &httpPost("http://$es_host/$INDEX/$SPECIMEN/_search",$requestJson);
 
-	#do a POST request
+	my @buckets = @{$$jsonResult{aggregations}{material}{buckets}};
+	foreach my $bucket(@buckets){
+		$counts{total}{$$bucket{key}}=$$bucket{doc_count};
+	}
+}
+#{
+#  "query": {
+#    "filtered": {
+#      "filter" : {
+#        "exists": {
+#          "field": "pedigree"
+#        }
+#      }
+#    } 
+#  }
+#}
+sub getNumberUsingES(){
+	my ($type,$term) = @_;
+	my %hash;
+	$hash{query}{filtered}{filter}{exists}{field}=$term;
+	my $requestJson = to_json(\%hash);
+	my $host = "http://$es_host/$INDEX/$type/_search";
+	my $jsonResult = &httpPost($host,$requestJson);
+	my $num = $$jsonResult{hits}{total};
+#	print "$num\n";	
+	return $num;
+}
+
+#do a POST request and return json file
+sub httpPost(){
+	my ($host,$content) = @_;
 	my $ua = LWP::UserAgent->new;
 	# set custom HTTP request header fields
-	my $req = HTTP::Request->new(POST => "http://$es_host/$INDEX/$SPECIMEN/_search");
+	my $req = HTTP::Request->new(POST => $host);
 	$req->header('content-type' => 'application/json');
-	$req->content($requestJson);
+	$req->content($content);
  
 	my $resp = $ua->request($req);
-	my $jsonResult;
+	my $jsonResult = "";
 	if ($resp->is_success) {
     	my $message = $resp->decoded_content;
     	#print "Received reply: $message\n";
@@ -168,14 +219,10 @@ sub getTotalNumber(){
 	}else{
     	print "HTTP POST error code: ", $resp->code, "\n";
     	print "HTTP POST error message: ", $resp->message, "\n";
-    	return;
 	}
-
-	my @buckets = @{$$jsonResult{aggregations}{material}{buckets}};
-	foreach my $bucket(@buckets){
-		$counts{total}{$$bucket{key}}=$$bucket{doc_count};
-	}
+	return $jsonResult;
 }
+
 #download the data
 sub getData(){
 	my ($es_host,$es_index,$es_type) = @_;
@@ -314,6 +361,7 @@ sub parseRulesetJSON(){
 	}
 	return \%optionalFields;
 }
+
 #read the content from the file handle and concatenate into a string
 sub readHandleIntoString(){
 	my $fh = $_[0];	

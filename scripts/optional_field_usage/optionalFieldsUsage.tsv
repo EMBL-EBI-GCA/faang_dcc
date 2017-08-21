@@ -1,55 +1,56 @@
-Section	Status	Field	Count	Total Entries	Percentage
-standard	optional	description	261	285	0.91578947368421
-standard	optional	availability	30	285	0.105263157894737
-standard	optional	same as	23	285	0.0807017543859649
-organism	recommended	birth date	121	285	0.424561403508772
-organism	recommended	health status	278	285	0.975438596491228
-organism	optional	birth location	19	285	0.0666666666666667
-organism	optional	birth location longitude	12	285	0.0421052631578947
-organism	optional	birth location latitude	12	285	0.0421052631578947
-organism	optional	birth weight	2	285	0.00701754385964912
-organism	optional	placental weight	0	285	0
-organism	optional	pregnancy length	2	285	0.00701754385964912
-organism	optional	delivery timing	0	285	0
-organism	optional	delivery ease	2	285	0.00701754385964912
-organism	optional	child of	24	285	0.0842105263157895
-organism	optional	pedigree	0	285	0
-specimen from organism	recommended	health status at collection	7750	8277	0.936329588014981
-specimen from organism	optional	fasted status	3052	8277	0.368732632596351
-specimen from organism	optional	number of pieces	121	8277	0.0146188232451371
-specimen from organism	optional	specimen volume	34	8277	0.0041077685151625
-specimen from organism	optional	specimen size	117	8277	0.0141355563610004
-specimen from organism	optional	specimen weight	146	8277	0.0176392412709919
-specimen from organism	optional	specimen picture url	0	8277	0
-specimen from organism	optional	gestational age at sample collection	0	8277	0
-pool of specimens	optional	specimen volume	0	0	NA
-pool of specimens	optional	specimen size	0	0	NA
-pool of specimens	optional	specimen weight	0	0	NA
-pool of specimens	optional	specimen picture url	0	0	NA
-cell specimen	optional	markers	2	163	0.0122699386503067
-cell line	recommended	catalogue number	0	0	NA
-cell line	recommended	passage number	0	0	NA
-cell line	recommended	date established	0	0	NA
-cell line	recommended	publication	0	0	NA
-cell line	optional	breed	0	0	NA
-cell line	optional	cell type	0	0	NA
-cell line	optional	culture conditions	0	0	NA
-cell line	optional	culture protocol	0	0	NA
-cell line	optional	disease	0	0	NA
-cell line	optional	karyotype	0	0	NA
-cell line	optional	derived from	0	0	NA
+Section	Status	Field	Total Entries	Count	Percentage	Count including not provided	Percentage including
+standard	optional	description	285	261	0.91578947368421	261	0.91578947368421
+standard	optional	availability	285	30	0.105263157894737	30	0.105263157894737
+standard	optional	same as	285	23	0.0807017543859649	23	0.0807017543859649
+organism	recommended	birth date	285	121	0.424561403508772	121	0.424561403508772
+organism	recommended	health status	285	278	0.975438596491228	278	0.975438596491228
+organism	optional	birth location	285	19	0.0666666666666667	21	0.0736842105263158
+organism	optional	birth location longitude	285	12	0.0421052631578947	14	0.0491228070175439
+organism	optional	birth location latitude	285	12	0.0421052631578947	14	0.0491228070175439
+organism	optional	birth weight	285	2	0.00701754385964912	4	0.0140350877192982
+organism	optional	placental weight	285	0	0	2	0.00701754385964912
+organism	optional	pregnancy length	285	2	0.00701754385964912	2	0.00701754385964912
+organism	optional	delivery timing	285	0	0	0	0
+organism	optional	delivery ease	285	2	0.00701754385964912	2	0.00701754385964912
+organism	optional	child of	285	24	0.0842105263157895	24	0.0842105263157895
+organism	optional	pedigree	285	0	0	4	0.0140350877192982
+specimen from organism	recommended	health status at collection	8277	7750	0.936329588014981	7750	0.936329588014981
+specimen from organism	optional	fasted status	8277	3052	0.368732632596351	3052	0.368732632596351
+specimen from organism	optional	number of pieces	8277	121	0.0146188232451371	121	0.0146188232451371
+specimen from organism	optional	specimen volume	8277	34	0.0041077685151625	106	0.0128065724296243
+specimen from organism	optional	specimen size	8277	117	0.0141355563610004	121	0.0146188232451371
+specimen from organism	optional	specimen weight	8277	146	0.0176392412709919	222	0.0268213120695904
+specimen from organism	optional	specimen picture url	8277	0	0	76	0.00918207079859853
+specimen from organism	optional	gestational age at sample collection	8277	0	0	0	0
+pool of specimens	optional	specimen volume	0	0	NA	0	NA
+pool of specimens	optional	specimen size	0	0	NA	0	NA
+pool of specimens	optional	specimen weight	0	0	NA	0	NA
+pool of specimens	optional	specimen picture url	0	0	NA	0	NA
+cell specimen	optional	markers	163	2	0.0122699386503067	4	0.0245398773006135
+cell line	recommended	catalogue number	0	0	NA	0	NA
+cell line	recommended	passage number	0	0	NA	0	NA
+cell line	recommended	date established	0	0	NA	0	NA
+cell line	recommended	publication	0	0	NA	0	NA
+cell line	optional	breed	0	0	NA	0	NA
+cell line	optional	cell type	0	0	NA	0	NA
+cell line	optional	culture conditions	0	0	NA	0	NA
+cell line	optional	culture protocol	0	0	NA	0	NA
+cell line	optional	disease	0	0	NA	0	NA
+cell line	optional	karyotype	0	0	NA	0	NA
+cell line	optional	derived from	0	0	NA	0	NA
 
 
 Average Percentage
-overall	recommended	0.778776529338327
-overall	optional	0.0852094617848121
-animal	recommended	0.7
-animal	optional	0.104453441295547
-specimen	recommended	0.936329588014981
-specimen	optional	0.0539379950798687
-standard	optional	0.367251461988304
-organism	recommended	0.7
-organism	optional	0.0256140350877193
-specimen from organism	recommended	0.936329588014981
-specimen from organism	optional	0.0598905745698062
-cell specimen	optional	0.0122699386503067
+Section	Status	Excluding	Including
+overall	recommended	0.778776529338327	0.778776529338327
+overall	optional	0.0852094617848121	0.0894446502640334
+animal	recommended	0.7	0.7
+animal	optional	0.104453441295547	0.108232118758435
+specimen	recommended	0.936329588014981	0.936329588014981
+specimen	optional	0.0539379950798687	0.0589150139606315
+standard	optional	0.367251461988304	0.367251461988304
+organism	recommended	0.7	0.7
+organism	optional	0.0256140350877193	0.0305263157894737
+specimen from organism	recommended	0.936329588014981	0.936329588014981
+specimen from organism	optional	0.0598905745698062	0.0638257477692055
+cell specimen	optional	0.0122699386503067	0.0245398773006135
