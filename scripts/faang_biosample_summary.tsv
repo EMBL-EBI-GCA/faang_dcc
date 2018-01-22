@@ -1,0 +1,184 @@
+FAANG BioSample data summary
+
+Summary of FAANG project sample data held in the BioSamples database at EMBL-EBI.
+
+Animal overview
+Number of records: 319
+
+Distribution of Sex:
+male	205
+female	100
+female genotypic sex	7
+male genotypic sex	6
+intact female	1
+
+Distribution of Species:
+Gallus gallus	132
+Ovis aries	63
+Sus scrofa	56
+Bos taurus	26
+Bos indicus	15
+Bubalus bubalis	13
+Capra hircus	11
+Equus caballus	3
+
+Distribution of Breed:
+chicken breed	124
+Texel sire x Scottish Blackface dam	35
+Pietrain	17
+German Landrace	16
+Brahman	15
+Norwegian Red	12
+Scottish Blackface	10
+Duroc	9
+Holstein	8
+Goat crossbreed	7
+Texel sire x (Texel sire x Scottish Blackface dam) dam	6
+Mediterranean	6
+Pandharpuri	5
+Large White	5
+White Leghorn line 6x White Leghorn line 7	4
+Spanish Churra	4
+Hereford (Line 1)	4
+White Leghorn	4
+Alpine	4
+Spanish Assaf	4
+Thoroughbred	3
+Yorkshire sire x Landrace dam	3
+Landrace,Large White	3
+Texel	3
+Yorkshire	2
+Cattle crossbreed	2
+Rambouillet	1
+Jafarabadi	1
+pig breed	1
+Bhadawari	1
+
+Distribution of Organization:
+University of Delaware	124
+The Roslin Institute and Royal Dick School of Veterinary Studies	88
+EMBL-EBI	87
+BBSRC	84
+LEIBNIZ-FBN	32
+The University of Queensland - SCMB	15
+Centre for Cellular and Molecular Biology	13
+Indian Department of Biotechnology	13
+BAIF	13
+NMBU-Norwegian University of Life Sciences	12
+aBRIDGE	12
+University of Leon	8
+USDA-ARS, Avian Disease and Oncology Laboratory	4
+Wageningen University &Research	4
+DEDJTR	4
+USDA-ARS Fort Keogh Livestock and Range Research Laboratory	4
+INRA	4
+Konkuk University	3
+Michigan State University, Department of Animal Science	2
+FBN	2
+The UWA Institute of Agriculture	1
+University of Illinois	1
+Washington State University	1
+Utah State University	1
+Virginia State University	1
+USDA-ARS-US Meat Animal Research Center	1
+USDA-ARS-ADRU	1
+University of Idaho	1
+Commonwealth Scientific and Industrial Research Organisation	1
+USDA-National Institute of Food and Agriculture	1
+Human Genome Sequencing Center Baylor College of Medicine	1
+AgResearch	1
+
+
+Sample overview
+
+Number of records: 8687
+
+Distribution of specimen types:
+specimen from organism	8469
+cell specimen	210
+pool of specimens	6
+cell culture	1
+cell line	1
+
+Distribution of Sex:
+female	4656
+male	3899
+female genotypic sex	79
+male genotypic sex	44
+intact female	9
+
+Distribution of Species:
+Ovis aries	2581
+Bos taurus	1739
+Sus scrofa	1430
+Capra hircus	1247
+Bubalus bubalis	954
+Gallus gallus	677
+Bos indicus	50
+Equus caballus	9
+
+Distribution of Breed:
+Texel sire x Scottish Blackface dam	2210
+Holstein	1300
+Large White	1235
+Alpine	1181
+White Leghorn	465
+Mediterranean	412
+Pandharpuri	401
+Hereford (Line 1)	322
+Scottish Blackface	140
+chicken breed	124
+Rambouillet	102
+Duroc	89
+Texel sire x (Texel sire x Scottish Blackface dam) dam	88
+White Leghorn line 6x White Leghorn line 7	88
+Bhadawari	73
+Norwegian Red	72
+Jafarabadi	68
+Goat crossbreed	66
+Brahman	50
+Cattle crossbreed	45
+Yorkshire	43
+Pietrain	21
+Yorkshire sire x Landrace dam	20
+German Landrace	16
+Spanish Churra	15
+Spanish Assaf	15
+Texel	11
+Thoroughbred	9
+Landrace,Large White	3
+pig breed	2
+Landrace	1
+
+Distribution of Organization:
+INRA	4094
+The Roslin Institute and Royal Dick School of Veterinary Studies	3655
+EMBL-EBI	3553
+BBSRC	3542
+Centre for Cellular and Molecular Biology	954
+Indian Department of Biotechnology	954
+BAIF	954
+USDA-ARS Fort Keogh Livestock and Range Research Laboratory	322
+University of Delaware	124
+The UWA Institute of Agriculture	102
+Washington State University	102
+University of Idaho	102
+Utah State University	102
+USDA-ARS-ADRU	102
+Virginia State University	102
+USDA-ARS-US Meat Animal Research Center	102
+AgResearch	102
+Commonwealth Scientific and Industrial Research Organisation	102
+USDA-National Institute of Food and Agriculture	102
+Human Genome Sequencing Center Baylor College of Medicine	102
+USDA-ARS, Avian Disease and Oncology Laboratory	88
+DEDJTR	80
+NMBU-Norwegian University of Life Sciences	72
+The University of Queensland - SCMB	50
+FBN	45
+Michigan State University, Department of Animal Science	43
+LEIBNIZ-FBN	32
+University of Leon	30
+Konkuk University	21
+Wageningen University &Research	19
+University of Illinois	12
