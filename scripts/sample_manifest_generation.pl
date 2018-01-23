@@ -19,12 +19,12 @@ use JSON -support_by_pp;
 use Search::Elasticsearch;
 use Data::Dumper;
 #pre-define the output file name
-my $detailOutput = "faang_biosample_details.tsv";
-my $summaryOutput = "faang_biosample_summary.tsv";
+my $detailOutput = "faang_samples_in_biosamples.tsv";
+my $summaryOutput = "biosample_summary.tsv";
 
 #the parameters expected to be retrieved from the command line
 my ($es_host, $es_index_name, $output_path);
-$output_path = ".";
+$output_path = "/hps/cstor01/nobackup/faang/farmpipe/supporting-info";
 $es_index_name = "faang";
 #Parse the command line options
 GetOptions(
