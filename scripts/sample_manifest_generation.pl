@@ -43,11 +43,9 @@ my %data; #the main data structure
 #1. read from the elastic search server in two steps: organism and specimen
 my @indice = qw/organism specimen/;
 foreach my $index(@indice){
-#	$index = "specimen";
 	&getData($index);
-#	last;
-#	exit;
 }
+
 #manual inspection of single record
 #print Dumper($data{specimen}{SAMEA104495754});
 
@@ -89,13 +87,14 @@ print SUMMARY "\nDistribution of Species:\n".&displayHash($data{summary}{specime
 print SUMMARY "\nDistribution of Breed:\n".&displayHash($data{summary}{specimen}{breed});
 print SUMMARY "\nDistribution of Organization:\n".&displayHash($data{summary}{specimen}{organization});
 
-print Dumper($data{summary});
 sub getData(){
 	my $index = $_[0];
 	my $url="$es_host/$es_index_name/$index/_search";
 	my $pipe;
 	open $pipe,"curl -XGET $url|";
 	#convert into json which is stored in a hash, return the ref to the hash
+	#default value for size (the number of returned matching records) is 10
+	#so to retrieve all records, it requires two steps: first get the total number second set the size accordingly
 	my $json = decode_json(&readHandleIntoString($pipe));
 	my $numOfRecords = $$json{hits}{total}; 
 	$data{count}{$index} = $numOfRecords;
@@ -157,7 +156,7 @@ sub parseSpecimen(){
 #	exit;
 	return \%result;
 }
-
+#the name of sub element will be represented as element name sub element name
 sub flatten(){
 	my %hash = %{$_[0]};
 	my $isSpecimen = $_[1];
@@ -206,11 +205,13 @@ sub flatten(){
 	return %result;
 }
 
+#parse the common part existing in both organism and specimen
+#for the extracted information, remove from the input data structure %in
 sub parseBasic(){
 	my %in = %{$_[0]};
 	my $isSpecimen = $_[1];
 	
-	if($isSpecimen == 0){
+	if($isSpecimen == 0){ #not specimen, so organism
 		$data{summary}{organism}{sex}{$in{sex}{text}}++;
 		$data{summary}{organism}{species}{$in{organism}{text}}++;
 		$data{summary}{organism}{breed}{$in{breed}{text}}++;
