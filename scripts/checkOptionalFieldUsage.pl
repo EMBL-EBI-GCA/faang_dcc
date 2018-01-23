@@ -4,6 +4,8 @@ use JSON;
 use Data::Dumper;
 use LWP::UserAgent;
 
+require "misc.pl";
+
 if (scalar @ARGV!=0){
 	print "Usage: perl checkOptionalFieldUsage.pl\n";
 	exit 1;
@@ -144,16 +146,6 @@ foreach my $section(@arr){
 		}
 	}
 }
-#calculate average of an array
-sub average(){
-	my @data=@_;
-	my $sum = 0;
-	my $len = scalar @data;
-	foreach my $data(@data){
-		$sum += $data;
-	}
-	return $sum/$len;
-}
 
 #get total number of each material type available using elasticsearch aggregation function and save into %counts
 #it only needs to be done for specimen, not for organism
@@ -201,27 +193,6 @@ sub getNumberUsingES(){
 	return $num;
 }
 
-#do a POST request and return json file
-sub httpPost(){
-	my ($host,$content) = @_;
-	my $ua = LWP::UserAgent->new;
-	# set custom HTTP request header fields
-	my $req = HTTP::Request->new(POST => $host);
-	$req->header('content-type' => 'application/json');
-	$req->content($content);
- 
-	my $resp = $ua->request($req);
-	my $jsonResult = "";
-	if ($resp->is_success) {
-    	my $message = $resp->decoded_content;
-    	#print "Received reply: $message\n";
-    	$jsonResult = decode_json($message);
-	}else{
-    	print "HTTP POST error code: ", $resp->code, "\n";
-    	print "HTTP POST error message: ", $resp->message, "\n";
-	}
-	return $jsonResult;
-}
 
 #download the data
 sub getData(){
@@ -362,28 +333,3 @@ sub parseRulesetJSON(){
 	return \%optionalFields;
 }
 
-#read the content from the file handle and concatenate into a string
-sub readHandleIntoString(){
-	my $fh = $_[0];	
-	my $str = "";
-	while (my $line = <$fh>) {
-		chomp($line);
-		$str .= $line;
-	}
-	return $str;
-}
-#convert a string containing _ or space into lower camel case
-sub toLowerCamelCase(){
-	my $str = $_[0];
-	$str=~s/_/ /g; 
-	$str =~ s/^\s+|\s+$//g;
-	$str = lc ($str);
-	$str =~s/ +(\w)/\U$1/g;
-	return $str;
-}
-#convert a lower camel case string into words separated by space in low cases
-sub fromLowerCamelCase(){
-	my $str = $_[0];
-	my @arr = split(/(?=[A-Z])/,$str);
-	return lc(join (" ",@arr));
-}
