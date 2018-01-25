@@ -573,7 +573,7 @@ sub biosample_ids_to_entities {
 
 sub fetch_sample_ids_matching_tag_and_value {
   my ( $search_tag_field, $search_tag_value ) = @_;
-  my $url = "https://www.ebi.ac.uk/biosamples/api/samples/search/findByText?text=".$search_tag_field.":".$search_tag_value;
+  my $url = "https://www.ebi.ac.uk/biosamples/samples?filter=attr%3A".$search_tag_field."%3A".$search_tag_value;
   my @pages = fetch_biosamples_json($url);
   my @samples;
   foreach my $page (@pages){
