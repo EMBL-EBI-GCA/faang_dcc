@@ -55,6 +55,9 @@ open OUT, ">limitedValuesList.tsv";
 print "deleting all existing xsd files to make sure the xsd file parsed are up-to-date\n";
 system ("rm *.xsd");
 
+my @totalInstruments;
+my %totalInstruments;
+
 my @elmts; #the data structure to be exported into json
 while (my $line = <TSV>){
 	chomp ($line);
@@ -70,8 +73,21 @@ while (my $line = <TSV>){
 	$hash{expected_sheet} = $sheet;
 	$hash{type} = "text";
 	push(@elmts,\%hash);
+
+	if ($columnName eq "INSTRUMENT_MODEL"){
+		my @val = @{$hash{valid_values}};
+		foreach my $val(@val){
+			#this way could make instrument models under one type being grouped together
+			unless (exists $totalInstruments{$val}){
+				$totalInstruments{$val} = 1;
+				push(@totalInstruments,$val);
+			}
+		}
+	}
 #	$toCheck{$xsdFile}{$entity}=1;
 }
+my $str = join("\t",@totalInstruments);
+print OUT "INSTRUMENT_MODEL\tExperiment_ENA\t\t$str\n";
 close OUT;
 #print Dumper(\%toCheck);
 
