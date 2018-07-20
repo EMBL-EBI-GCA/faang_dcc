@@ -17,8 +17,8 @@ GetOptions("dev" => \$dev,
            "listtoremove=s" => \$listtoremove #Tab seperated list of BioSample -> field to remove\n
 );
 
-die "missing authuser" if !$authuser;
-die "missing authpass" if !$authpass;
+die "missing authuser (username)" if !$authuser;
+die "missing authpass (password)" if !$authpass;
 die "missing list of sample fields to remove" if !$listtoremove;
 
 
@@ -36,26 +36,27 @@ $auth->get($authurl);
 my $token = $auth->content();
 $token = "Bearer ".$token;
 
-my %biosamplestofix;
+my %biosamplesToFix;
 #List samples to remove here
 open my $fhi, '<', $listtoremove or die "could not open $listtoremove $!";
 my @lines = <$fhi>;
+#each line separated by tab, two columns, biosample id and field name
 foreach my $line (@lines){
   chomp($line);
   my @parts = split("\t", $line);
-  if ($biosamplestofix{$parts[0]}){
-    push($biosamplestofix{$parts[0]}, $parts[1]);
+  if ($biosamplesToFix{$parts[0]}){
+    push($biosamplesToFix{$parts[0]}, $parts[1]);
   }else{
-    $biosamplestofix{$parts[0]} = [$parts[1]];
+    $biosamplesToFix{$parts[0]} = [$parts[1]];
   }
 }
 
-print Dumper(%biosamplestofix);
+print Dumper(%biosamplesToFix);
 
-foreach my $key (keys(%biosamplestofix)){
+foreach my $key (keys(%biosamplesToFix)){
   my $sampleurl = "https://www.ebi.ac.uk/biosamples/samples/".$key;
   my $cellline = fetch_json_by_url($sampleurl);
-  foreach my $fieldtofix (@{$biosamplestofix{$key}}){
+  foreach my $fieldtofix (@{$biosamplesToFix{$key}}){
     my %curatedata;
     my $toprocess = $$cellline{characteristics}{$fieldtofix};
     if($toprocess){
