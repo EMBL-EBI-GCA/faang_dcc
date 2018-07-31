@@ -54,7 +54,8 @@ print Dumper(%biosamplestofix);
 
 my %ontologyMapping = (
   "male" => "http://purl.obolibrary.org/obo/PATO_0000384",
-  "female" => "http://purl.obolibrary.org/obo/PATO_0000383"
+  "female" => "http://purl.obolibrary.org/obo/PATO_0000383",
+  "liver" => "http://purl.obolibrary.org/obo/UBERON_0002107"
 );
 
 
