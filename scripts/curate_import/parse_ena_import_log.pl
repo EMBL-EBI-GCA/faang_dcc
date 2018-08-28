@@ -11,7 +11,7 @@ my $output_all_submissions = 0; #1 means output every submission even there is n
 my $es_host = "http://ves-hx-e4:9200/faang/dataset/_search?size=100";
 my %datasets = &getDatasets($es_host);
 #my %datasets;
-open IN, "ena_import_errors_20180717.txt";
+open IN, $ARGV[0];
 my %errors;
 
 #parse the local import error log file
