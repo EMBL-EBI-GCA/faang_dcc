@@ -37,6 +37,7 @@ my $token = $auth->content();
 $token = "Bearer ".$token;
 
 my %biosamplestofix;
+my @biosampleInOrder;
 #List samples to remove here
 open my $fhi, '<', $listtoupdate or die "could not open $listtoupdate $!";
 my @lines = <$fhi>;
@@ -47,6 +48,7 @@ foreach my $line (@lines){
     push($biosamplestofix{$parts[0]}, $parts[1]);
   }else{
     $biosamplestofix{$parts[0]} = [$parts[1]];
+    push (@biosampleInOrder,$parts[0]);
   }
 }
 
@@ -61,7 +63,8 @@ my %ontologyMapping = (
 );
 
 
-foreach my $key (keys(%biosamplestofix)){
+#foreach my $key (keys(%biosamplestofix)){
+foreach my $key (@biosampleInOrder){
   my $sampleurl = "https://www.ebi.ac.uk/biosamples/samples/".$key;
   my $cellline = fetch_json_by_url($sampleurl);
   foreach my $fieldtofix (@{$biosamplestofix{$key}}){
@@ -123,25 +126,6 @@ foreach my $key (keys(%biosamplestofix)){
   }
 }
 
-#use BioSample API to retrieve BioSample records
-sub fetch_biosamples_json{
-  my ($json_url) = @_;
-
-  my $json_text = &fetch_json_by_url($json_url);
-  my @biosamples;
-  # Store the first page 
-  foreach my $item (@{$json_text->{_embedded}{samples}}){ 
-    push(@biosamples, $item);
-  }
-  # Store each additional page
-  while ($$json_text{_links}{next}{href}){  # Iterate until no more pages using HAL links
-    $json_text = fetch_json_by_url($$json_text{_links}{next}{href});# Get next page
-    foreach my $item (@{$json_text->{_embedded}{samples}}){
-      push(@biosamples, $item);  
-    }
-  }
-  return @biosamples;
-}
 
 sub fetch_json_by_url{
   my ($json_url) = @_;
