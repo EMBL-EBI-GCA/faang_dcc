@@ -14,10 +14,12 @@ my %datasets = &getDatasets($es_host);
 open IN, $ARGV[0];
 my %errors;
 
+my %exps_in_dataset;
 #parse the local import error log file
 while (my $line =<IN>){
 	chomp($line);
-	my ($exp_id,undef,$overall,$detail) = split("\t",$line);
+	my ($exp_id,$dataset_id,undef,$overall,$detail) = split("\t",$line);
+	push (@{$exps_in_dataset{$dataset_id}},$exp_id);
 	next unless ($overall eq "error" || $include_warning == 1); #continue only if error or set to include warnings
 	my @errors = split(";",$detail);
 	my %msgs;#use hash to avoid duplicate error in the same experiment record
@@ -43,7 +45,8 @@ while (my $line =<IN>){
 $"=", ";
 my $count = 0;
 foreach my $dataset(sort {$a cmp $b} keys %datasets){
-	next if ($datasets{$dataset}{standardMet} eq 'FAANG'); #meet the standard, no need to worry about
+	next if ($datasets{$dataset}{standardMet} eq 'FAANG'); #meet the standard, no need to worry about errors
+	delete $exps_in_dataset{$dataset};
 	my $str = "ENA Study id: $dataset\n";
 	$str .= "Secondary accession: $datasets{$dataset}{secondaryAccession}\n";
 	$str .= "Title: $datasets{$dataset}{title}\n";
@@ -55,30 +58,54 @@ foreach my $dataset(sort {$a cmp $b} keys %datasets){
 	my %error_type;
 	foreach my $one (@{$datasets{$dataset}{experiment}}){
 		my $exp_id = $$one{accession};
-		#some records are totally valid
-		next unless (exists $errors{$exp_id});
-		my @errors = @{$errors{$exp_id}{error}};
-		foreach my $msg(@errors){
-			$error_type{"error:$msg"}{$exp_id}=1;
-		}
-		if ($include_warning == 1){
-			foreach my $msg (@{$errors{$exp_id}{warning}}){
-				$error_type{"warning:$msg"}{$exp_id}=1;
-			}
-		}
+		%error_type = &add_error($exp_id,\%error_type);
 	}
 
 	if (scalar keys %error_type > 0 || $output_all_submissions == 1){
 		print "$str\n";
+	}
+	&printErrors(\%error_type);
+}
+
+print "Datasets not imported into data portal:\n";
+foreach my $dataset_id(sort {$a cmp $b} keys %exps_in_dataset){
+	print "ENA Study id: $dataset_id\n";
+	my %error_type;
+	my @exps = @{$exps_in_dataset{$dataset_id}};
+	foreach my $exp_id(@exps){
+		%error_type = &add_error($exp_id,\%error_type);
+	}
+	&printErrors(\%error_type);
+}
+
+sub printErrors(){
+	my %error_type = %{$_[0]};
+	if (scalar keys %error_type > 0 || $output_all_submissions == 1){
 		foreach my $error(keys %error_type){
 			my ($type, $field, $detail) = split(":",$error);
 			print "List of fields that are in $type: $field\nSummary of $type: $detail\n";
 			my @tmp = sort keys %{$error_type{$error}};
 			print "Affected experiment records: @tmp\n\n";
 		}
-
 		print "\n\n\n";
 	}
+}
+
+sub add_error(){
+	my ($exp_id,$hashref) = @_;
+	my %error_type = %$hashref;
+	#some records are totally valid
+	return %error_type unless (exists $errors{$exp_id});
+	my @errors = @{$errors{$exp_id}{error}};
+	foreach my $msg(@errors){
+		$error_type{"error:$msg"}{$exp_id}=1;
+	}
+	if ($include_warning == 1){
+		foreach my $msg (@{$errors{$exp_id}{warning}}){
+			$error_type{"warning:$msg"}{$exp_id}=1;
+		}
+	}
+	return %error_type;
 }
 
 sub printArray(){
