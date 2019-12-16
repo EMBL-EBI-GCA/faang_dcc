@@ -1,6 +1,0 @@
-cd /hps/cstor01/nobackup/faang/farmpipe/supporting-info/
-git pull --quiet origin master
-git add .
-curtime=`date`
-git diff-index --quiet HEAD || git commit --quiet -m "Automated BioSamples Dump backup @ $curtime"
-git push --quiet origin master

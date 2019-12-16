@@ -1,11 +1,6 @@
 Perl common function library
 misc.pl   			version 1.1.0
 
-Manifest file generation
-sample_manifest_generation.pl  	generate both detail and summary manifest files of BioSample from ES 
-biosamples_tsv_git.run			automatically commit to repository
-ftp_biosample_dumps.sh			ftp the generated manifest files to FTP site
-
 ChIP Input control mappings
 chip_input_control.pl
 chip_input_control.sh
@@ -16,16 +11,8 @@ checkOptionalFieldUsage.pl
 Find mandatory field containing null value
 nullInMandatory.pl
 
-Unknown usage
-cleanup_archive.sh
-experiment_data_dumper.pl
-experiment_data_dumps.sh
-sample_group_dumper.pl
-sample_group_dumps.sh
-sample_group_maintenance.pl
-sync_metadata.sh
+Update the directory tree listing on the FTP
 update_current_tree.sh
-
 
 ENA controlled vocabularies
 ena_cv/all_limited_columns.tsv  				input file of parseMandatoryFieldsInENAxsdFiles.pl, listing all columns with limited values
