@@ -11,9 +11,6 @@ checkOptionalFieldUsage.pl
 Find mandatory field containing null value
 nullInMandatory.pl
 
-Update the directory tree listing on the FTP
-update_current_tree.sh
-
 ENA controlled vocabularies
 ena_cv/all_limited_columns.tsv  				input file of parseMandatoryFieldsInENAxsdFiles.pl, listing all columns with limited values
 ena_cv/extractAllowValuesFromXSDtoJSON.pl       extract the allowed values into TSV file (limitedValueList.txt) and JSON file (ena_metadata_ruleset.json)
